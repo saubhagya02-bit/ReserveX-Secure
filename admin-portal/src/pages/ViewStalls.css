@@ -1,12 +1,25 @@
+body {
+  margin: 0;
+  padding: 0;
+}
+
+.view-stalls-background {
+  padding: 0 0 30px 0;
+  background-color: #e6f2ff;
+  min-height: 100vh;
+}
+
 .view-stalls-page {
   padding: 30px;
-  background-color: #f4f6f9;
+  background-color: #e6f2ff;
   min-height: 100vh;
 }
 
 .view-stalls-title {
   margin-bottom: 20px;
-  font-size: 24px;
+  margin-left: 30px;
+  /* Match Manage Stalls heading size */
+  font-size: 36px;
   font-weight: 600;
   color: #2c3e50;
 }
@@ -17,6 +30,18 @@
   align-items: center;
   gap: 24px;
   margin-bottom: 20px;
+  /* align controls to the left (match table margin) */
+  justify-content: flex-start;
+  margin-left: 30px;
+  transform: none;
+}
+
+@media (max-width: 768px) {
+  .view-stalls-controls {
+    transform: none;
+    justify-content: center;
+    margin-left: 0;
+  }
 }
 
 .control-group {
@@ -84,6 +109,26 @@
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.view-stalls-loading,
+.view-stalls-error {
+  padding: 24px;
+  text-align: center;
+  color: #555;
+}
+
+.view-stalls-error {
+  color: #c62828;
+}
+
+/* Container to align table with Manage Stalls table */
+.view-stalls-table-container {
+  background: white;
+  padding: 24px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  margin: 0 30px;
 }
 
 .view-stalls-table thead {

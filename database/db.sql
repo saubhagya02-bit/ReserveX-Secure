@@ -5,7 +5,9 @@ Table users {
   username varchar [unique]
   password varchar
   no_of_current_bookings int
+  role enum('VENDOR','EMPLOYEE')
   created_at timestamp
+  last_updated_at timestamp
 }
 
 Table stalls {

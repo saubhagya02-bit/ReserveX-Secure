@@ -1,6 +1,17 @@
+body {
+  margin: 0;
+  padding: 0;
+}
+
+.manage-stalls-background {
+  padding: 0 0 30px 0;
+  background-color: #e6f2ff;
+  min-height: 100vh;
+}
+
 .manage-stalls {
   padding: 30px;
-  background-color: #f4f6f9;
+  background-color: #e6f2ff;
   min-height: 100vh;
 }
 
@@ -9,6 +20,7 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 24px;
+  margin: 20px 30px 24px 30px;
 }
 
 .manage-stalls-header h1 {
@@ -77,7 +89,7 @@
   padding: 24px;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  margin-bottom: 24px;
+  margin: 0 30px 24px 30px;
 }
 
 .stall-form h2 {
@@ -122,6 +134,47 @@
   border-color: #3b82f6;
 }
 
+.form-group input.input-error {
+  border-color: #dc3545;
+}
+
+.form-group input.input-error:focus {
+  border-color: #dc3545;
+  box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.2);
+}
+
+.form-group input.readonly-field {
+  background-color: #f8f9fa;
+  cursor: not-allowed;
+  color: #495057;
+}
+
+.field-hint {
+  display: block;
+  font-size: 12px;
+  color: #6c757d;
+  margin-top: 4px;
+  font-style: italic;
+}
+
+.field-error {
+  display: block;
+  font-size: 12px;
+  color: #dc3545;
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+.stall-form-clean {
+  border-left: 4px solid #3b82f6;
+}
+
+.table-loading {
+  padding: 24px;
+  text-align: center;
+  color: #555;
+}
+
 .form-actions {
   display: flex;
   gap: 12px;
@@ -132,6 +185,7 @@
   padding: 24px;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  margin: 0 30px;
 }
 
 .table-header-row {
@@ -203,6 +257,51 @@
   font-weight: 700;
 }
 
+/* Column-specific alignment */
+.stalls-table th:nth-child(1),
+.stalls-table td:nth-child(1) {
+  text-align: left;
+  width: 10%;
+  padding-left: 20px;
+}
+
+.stalls-table th:nth-child(2),
+.stalls-table td:nth-child(2) {
+  text-align: left;
+  width: 10%;
+}
+
+.stalls-table th:nth-child(3),
+.stalls-table td:nth-child(3) {
+  text-align: center;
+  width: 13%;
+}
+
+.stalls-table th:nth-child(4),
+.stalls-table td:nth-child(4) {
+  text-align: center;
+  width: 13%;
+}
+
+.stalls-table th:nth-child(5),
+.stalls-table td:nth-child(5) {
+  text-align: center;
+  width: 15%;
+}
+
+.stalls-table th:nth-child(6),
+.stalls-table td:nth-child(6) {
+  text-align: center;
+  width: 14%;
+}
+
+.stalls-table th:nth-child(7),
+.stalls-table td:nth-child(7) {
+  text-align: center;
+  width: 25%;
+  padding-right: 20px;
+}
+
 .stalls-table tbody tr {
   border-bottom: 1px solid #eee;
 }
@@ -241,10 +340,21 @@
 
 .success-message {
   padding: 12px 20px;
-  margin-bottom: 20px;
+  margin: 0 30px 20px 30px;
   background-color: #d4edda;
   color: #155724;
   border: 1px solid #c3e6cb;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.error-message {
+  padding: 12px 20px;
+  margin: 0 30px 20px 30px;
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
   border-radius: 6px;
   font-size: 14px;
   font-weight: 500;
@@ -285,4 +395,31 @@
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+}
+
+/* Unreserve icon button */
+.btn-unreserve-icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  margin-left: 8px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s;
+  vertical-align: middle;
+}
+
+.btn-unreserve-icon:hover {
+  background-color: rgba(59, 130, 246, 0.1);
+  transform: scale(1.1);
+}
+
+.btn-unreserve-icon:active {
+  transform: scale(0.95);
+}
+
+/* Text utilities */
+.capitalize {
+  text-transform: capitalize;
 }

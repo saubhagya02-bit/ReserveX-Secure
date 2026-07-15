@@ -85,6 +85,9 @@ const RegisterPage = () => {
                 <input
                   type="text"
                   name="BuissnesName"
+
+                  name="business_name"
+
                   placeholder="Business Name (e.g. Sarasavi Publishers)"
                   onChange={handleChange}
                   required

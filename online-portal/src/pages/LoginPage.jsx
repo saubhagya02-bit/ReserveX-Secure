@@ -15,31 +15,34 @@ const LoginPage = () => {
   const { login } = useContext(AuthContext);
   const navigate = useNavigate();
 
-  const handleSubmit = async(e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    try{
+    try {
       const response = await loginUser(email, password);
 
+      console.log(response);
+
       //Check the vendor role
-      if (response.user?.roles?.toUpperCase() !== "VENDOR") {
+      if (response?.role?.toUpperCase() !== "VENDOR") {
         throw "Access Denied: This portal is for Vendors only.";
       }
+      const { token, type, ...userData } = response;
 
-      login(response.user, response.token);
+      login(userData, token);
 
-      console.log(response.user)
+      // console.log(response.user)
       console.log(response.token)
       toast.success("Login Successful Welcome back!");
       navigate("/home");
 
-    }catch(errorMessage){
+    } catch (errorMessage) {
       console.error("Login failed:", errorMessage);
       toast.error(errorMessage);
-    }finally{
+    } finally {
       setIsLoading(false);
     }
-    
+
   };
 
   return (
@@ -56,11 +59,10 @@ const LoginPage = () => {
         <div className="flex">
           <button
             onClick={() => setActiveTab("login")}
-            className={`flex-1 py-3 text-sm font-medium transition ${
-              activeTab === "login"
-                ? "border-b-2 border-blue-500 text-blue-600"
-                : "text-gray-500"
-            }`}
+            className={`flex-1 py-3 text-sm font-medium transition ${activeTab === "login"
+              ? "border-b-2 border-blue-500 text-blue-600"
+              : "text-gray-500"
+              }`}
           >
             Sign In
           </button>
@@ -80,7 +82,7 @@ const LoginPage = () => {
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            
+
             <div className="relative">
               <label className="block text-sm mb-2">Email Address</label>
               <div className="relative">

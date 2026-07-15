@@ -49,7 +49,7 @@ const AboutPage = () => {
         <div className="max-w-6xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
 
           <div className="bg-white p-6 rounded-xl shadow">
-            <h2 className="text-3xl font-bold text-blue-600">1M+</h2>
+            <h2 className="text-3xl font-bold text-blue-600">50K+</h2>
             <p className="text-gray-500 mt-2">Annual Visitors</p>
           </div>
 
@@ -59,8 +59,8 @@ const AboutPage = () => {
           </div>
 
           <div className="bg-white p-6 rounded-xl shadow">
-            <h2 className="text-3xl font-bold text-blue-600">25+</h2>
-            <p className="text-gray-500 mt-2">Countries</p>
+            <h2 className="text-3xl font-bold text-blue-600">100K+</h2>
+            <p className="text-gray-500 mt-2">Books Displayed</p>
           </div>
 
           <div className="bg-white p-6 rounded-xl shadow">
@@ -121,7 +121,7 @@ const AboutPage = () => {
             </h2>
 
             <p className="text-gray-500 mt-3 max-w-2xl mx-auto">
-              Hosted at the prestigious Bandaranaike Memorial International Conference Hall (BMICH), 
+              Hosted at the prestigious Bandaranaike Memorial International Conference Hall (BMICH),
               the fair spans across multiple halls and outdoor pavilions.
             </p>
           </div>

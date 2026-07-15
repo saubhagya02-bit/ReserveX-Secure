@@ -1,3 +1,5 @@
+//Loads user details for Spring Security authentication by email (username)
+
 package com.reservex.backend.config;
 
 import com.reservex.backend.repositories.UserRepository;

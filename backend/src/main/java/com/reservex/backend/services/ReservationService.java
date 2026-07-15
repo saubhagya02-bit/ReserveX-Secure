@@ -1,3 +1,7 @@
+// “max 3 stalls” rule
+// create reservation + link stalls
+//cancel reservation
+
 package com.reservex.backend.services;
 
 import com.reservex.backend.dto.ReservationDto;
@@ -31,7 +35,7 @@ public class ReservationService {
      * Convenience method for reserving a single stall.
      */
     @Transactional
-    public ReservationDto createReservation(Long userId, Long stallId) {
+    public ReservationDto createReservation(Integer userId, Integer stallId) {
         List<ReservationDto> reservations = createReservations(userId, List.of(stallId));
         return reservations.isEmpty() ? null : reservations.get(0);
     }
@@ -43,7 +47,7 @@ public class ReservationService {
      * field on {@link User}.
      */
     @Transactional
-    public List<ReservationDto> createReservations(Long userId, List<Long> stallIds) {
+    public List<ReservationDto> createReservations(Integer userId, List<Integer> stallIds) {
         if (stallIds == null || stallIds.isEmpty()) {
             throw new IllegalArgumentException("At least one stall is required");
         }
@@ -53,8 +57,9 @@ public class ReservationService {
 
         // Filter and load stalls that are not already reserved
         var stallsToBook = new HashSet<Stall>();
-        for (Long stallId : stallIds) {
-            if (stallId == null) continue;
+        for (Integer stallId : stallIds) {
+            if (stallId == null)
+                continue;
             if (reservationRepository.existsByStalls_Id(stallId)) {
                 continue; // already reserved, skip
             }
@@ -74,8 +79,18 @@ public class ReservationService {
 
         Reservation reservation = Reservation.builder()
                 .user(user)
+                .status(Reservation.Status.Approved)
                 .build();
         reservation.getStalls().addAll(stallsToBook);
+
+        // Tell the Stalls about the Reservation
+        // This forces Hibernate to write the link to the database,
+        for (Stall stall : stallsToBook) {
+            // Make sure your Stall entity has a getReservations() list!
+            if (stall.getReservations() != null) {
+                stall.getReservations().add(reservation);
+            }
+        }
 
         reservation = reservationRepository.save(reservation);
 
@@ -83,6 +98,17 @@ public class ReservationService {
         user.setNoOfCurrentBookings(currentBookings + newBookings);
         userRepository.save(user);
 
+        // Mark stalls as confirmed
+        for (Stall stall : stallsToBook) {
+            stall.setIsConfirmed(true);
+            stallRepository.save(stall);
+        }
+
+        // Flush to ensure all data is persisted before sending email
+        reservationRepository.flush();
+        stallRepository.flush();
+        
+        // Send email with reservation details
         emailService.sendReservationConfirmation(user, reservation);
 
         List<ReservationDto> result = new ArrayList<>();
@@ -91,17 +117,21 @@ public class ReservationService {
     }
 
     @Transactional(readOnly = true)
-    public List<ReservationDto> getMyReservations(Long userId) {
+    public List<ReservationDto> getMyReservations(Integer userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
         return reservationRepository.findByUserOrderByReservationDateDesc(user).stream()
+
+        return reservationRepository.findByUserWithDetailsOrderByReservationDateDesc(user).stream()
+
                 .map(ReservationDto::fromEntity)
                 .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public List<ReservationDto> getAllReservations() {
-        return reservationRepository.findAll().stream()
+        return reservationRepository.findAllWithDetails().stream()
                 .map(ReservationDto::fromEntity)
                 .collect(Collectors.toList());
     }

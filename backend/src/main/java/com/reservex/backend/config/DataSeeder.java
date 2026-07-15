@@ -1,3 +1,5 @@
+// Inserts sample data at startup (e.g., admin user / sample stalls) if you coded it that way
+
 package com.reservex.backend.config;
 
 import com.reservex.backend.entity.Stall;
@@ -15,15 +17,11 @@ import java.util.List;
 @RequiredArgsConstructor
 public class DataSeeder implements CommandLineRunner {
 
-    private final StallRepository stallRepository;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Override
     public void run(String... args) {
-        if (stallRepository.count() == 0) {
-            seedStalls();
-        }
         if (!userRepository.existsByEmail("admin@bookfair.lk")) {
             seedAdminUser();
         }

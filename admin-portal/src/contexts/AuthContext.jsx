@@ -1,12 +1,17 @@
 import React, { createContext, useState, useEffect } from 'react';
 import api from '../services/api';
-import { jwtDecode } from "jwt-decode"; 
+import { jwtDecode } from "jwt-decode";
 
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
+
+    const logout = () => {
+        localStorage.removeItem('token');
+        setUser(null);
+    };
 
     useEffect(() => {
         // Check for existing token on page load to keep user logged in
@@ -16,21 +21,24 @@ export const AuthProvider = ({ children }) => {
                 const decoded = jwtDecode(token);
                 // Check if token is expired
                 if (decoded.exp * 1000 < Date.now()) {
-                    logout();
+                    localStorage.removeItem('token');
+                    setUser(null);
                 } else {
                     setUser(decoded);
                 }
             } catch (error) {
-                logout();
+                console.error('Token decode error:', error);
+                localStorage.removeItem('token');
+                setUser(null);
             }
         }
         setLoading(false);
     }, []);
 
-    const login = async (username, password) => {
+    const login = async (email, password) => {
         try {
             // Adjust this URL if your backend login endpoint is different
-            const response = await api.post('/auth/login', { username, password });
+            const response = await api.post('/auth/login', { email, password });
             
             // Assuming your backend returns { "token": "..." }
             const { token } = response.data; 
@@ -46,11 +54,6 @@ export const AuthProvider = ({ children }) => {
             console.error("Login failed:", error);
             return false;
         }
-    };
-
-    const logout = () => {
-        localStorage.removeItem('token');
-        setUser(null);
     };
 
     return (

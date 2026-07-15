@@ -18,7 +18,7 @@ public class Stall {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "stall_id")
-    private Long id;
+    private Integer id;
 
     @Column(name = "stall_name", nullable = false, unique = true)
     private String name;
@@ -29,20 +29,24 @@ public class Stall {
 
     private Double price;
 
+    @Column(name = "gridCol")
     private int gridCol;
 
-    private int gridRow; 
+    @Column(name = "gridRow")
+    private int gridRow;
 
     @Column(name = "is_Confirmed")
     private Boolean isConfirmed;
 
-    @ManyToMany(mappedBy = "stalls")                                    // to navigate Stall → Reservations.
+    @Column(columnDefinition = "TEXT")
+    private String description;
+
+    @ManyToMany(mappedBy = "stalls") // to navigate Stall → Reservations.
     private Set<Reservation> reservations = new HashSet<>();
 
-
     public enum StallSize {
-        SMALL,
-        MEDIUM,
-        LARGE
+        small,
+        medium,
+        large
     }
 }

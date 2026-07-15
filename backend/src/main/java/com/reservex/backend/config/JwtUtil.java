@@ -1,3 +1,8 @@
+// Creates JWT tokens
+// Extracts email/username from token
+// Validates token
+
+
 package com.reservex.backend.config;
 
 import io.jsonwebtoken.*;
@@ -25,14 +30,15 @@ public class JwtUtil {
 
     public String generateToken(Authentication authentication) {
         var principal = (com.reservex.backend.config.UserPrincipal) authentication.getPrincipal();
-        return generateToken(principal.getEmail(), principal.getId(), principal.getRole());
+        return generateToken(principal.getEmail(), principal.getId(), principal.getRole(), principal.getUsername());
     }
 
-    public String generateToken(String email, Long userId, String role) {
+    public String generateToken(String email, Integer userId, String role, String username) {
         return Jwts.builder()
                 .subject(email)
                 .claim("userId", userId)
                 .claim("role", role)
+                .claim("username", username)
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
                 .signWith(getSigningKey())
@@ -48,15 +54,15 @@ public class JwtUtil {
                 .getSubject();
     }
 
-    public Long getUserIdFromToken(String token) {
+    public Integer getUserIdFromToken(String token) {
         var claims = Jwts.parser()
                 .verifyWith(getSigningKey())
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
         Object userId = claims.get("userId");
-        if (userId instanceof Integer) return ((Integer) userId).longValue();
-        if (userId instanceof Long) return (Long) userId;
+        if (userId instanceof Integer) return (Integer) userId;
+        if (userId instanceof Long) return ((Long) userId).intValue();
         return null;
     }
 

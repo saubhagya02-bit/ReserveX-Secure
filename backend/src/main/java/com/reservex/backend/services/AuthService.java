@@ -1,3 +1,8 @@
+// register user (hash password)
+// login (validate password)
+// issue JWT
+
+
 package com.reservex.backend.services;
 
 import com.reservex.backend.config.JwtUtil;
@@ -35,9 +40,11 @@ public class AuthService {
                 .username(request.getUsername())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .businessName(request.getBusinessName())
+
 //                .contactPerson(request.getContactPerson())
 //                .phone(request.getPhone())
 //                .address(request.getAddress())
+
                 .role(User.Role.VENDOR)
                 .build();
         return userRepository.save(user);
@@ -52,6 +59,7 @@ public class AuthService {
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
         return LoginResponse.builder()
                 .token(token)
+
                 .user(LoginResponse.UserInfo.builder()
                         .userId(user.getId())
                         .username(user.getUsername())
@@ -60,6 +68,13 @@ public class AuthService {
                         .roles(user.getRole().name())
                         .noOfCurrentBookings(user.getNoOfCurrentBookings())
                         .build())
+
+                .id(principal.getId())
+                .email(principal.getEmail())
+                .businessName(principal.getBusinessName())
+                .role(principal.getRole())
+                .noOfCurrentBookings(principal.getNoOfCurrentBookings())
+
                 .build();
     }
 }

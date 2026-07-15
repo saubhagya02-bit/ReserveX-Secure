@@ -1,167 +1,331 @@
-import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import React, { useContext, useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import "./AdminProfile.css";
+import "../components/NavBar.css";
+import api from "../services/api";
+import { AuthContext } from "../contexts/AuthContext";
 
 export default function AdminProfile() {
-  const [profile, setProfile] = useState({
-    name: "Admin User",
-    email: "admin@bookfair.lk",
-  });
-  const [profilePicture, setProfilePicture] = useState(null);
-  const [password, setPassword] = useState({ current: "", new: "", confirm: "" });
-  const [message, setMessage] = useState("");
+  const { user, logout } = useContext(AuthContext);
+  const navigate = useNavigate();
 
-  const handlePictureChange = (e) => {
-    const file = e.target.files?.[0];
-    if (file && file.type.startsWith("image/")) {
-      setProfilePicture(URL.createObjectURL(file));
+  const [profile, setProfile] = useState(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+
+  const [form, setForm] = useState({
+    newPassword: "",
+    confirmPassword: "",
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState(null); // { type: 'success'|'error', text: string }
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+
+  const clearMessageSoon = () => {
+    window.setTimeout(() => setMessage(null), 3500);
+  };
+
+  const loadProfile = async () => {
+    setLoadingProfile(true);
+    try {
+      const res = await api.get("/users/me");
+      setProfile(res.data);
+    } catch (err) {
+      setProfile(null);
+      setMessage({ type: "error", text: err?.response?.data?.message || "Failed to load profile." });
+      clearMessageSoon();
+    } finally {
+      setLoadingProfile(false);
     }
   };
 
-  const handleRemovePicture = () => {
-    if (profilePicture) URL.revokeObjectURL(profilePicture);
-    setProfilePicture(null);
-  };
+  useEffect(() => {
+    loadProfile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const handleProfileChange = (e) => {
+  const onChange = (e) => {
     const { name, value } = e.target;
-    setProfile((prev) => ({ ...prev, [name]: value }));
+    setForm((p) => ({ ...p, [name]: value }));
   };
 
-  const handlePasswordChange = (e) => {
-    const { name, value } = e.target;
-    setPassword((prev) => ({ ...prev, [name]: value }));
+  const passwordChecks = useMemo(() => {
+    const pwd = form.newPassword || "";
+    return {
+      minLength: pwd.length >= 8,
+      hasLower: /[a-z]/.test(pwd),
+      hasNumber: /\d/.test(pwd),
+      hasSpecial: /[^A-Za-z\d]/.test(pwd),
+      matchesConfirm:
+        form.confirmPassword.length > 0 && pwd.length > 0 && pwd === form.confirmPassword,
+    };
+  }, [form.confirmPassword, form.newPassword]);
+
+  const canSubmit = useMemo(() => {
+    const checksOk =
+      passwordChecks.minLength &&
+      passwordChecks.hasLower &&
+      passwordChecks.hasNumber &&
+      passwordChecks.hasSpecial &&
+      (form.newPassword?.length ?? 0) > 0 &&
+      form.newPassword === form.confirmPassword;
+
+    return !submitting && checksOk;
+  }, [form.confirmPassword, form.newPassword, passwordChecks, submitting]);
+
+  const formatDateTime = (iso) => {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "—";
+    return d.toLocaleString();
   };
 
-  const handleProfileSubmit = (e) => {
+  const handleChangePassword = async (e) => {
     e.preventDefault();
-    setMessage("Profile updated successfully.");
-    setTimeout(() => setMessage(""), 3000);
-  };
+    setMessage(null);
 
-  const handlePasswordSubmit = (e) => {
-    e.preventDefault();
-    if (password.new !== password.confirm) {
-      setMessage("New passwords do not match.");
+    if (form.newPassword !== form.confirmPassword) {
+      setMessage({ type: "error", text: "New password and confirmation do not match." });
+      clearMessageSoon();
       return;
     }
-    setMessage("Password updated successfully.");
-    setPassword({ current: "", new: "", confirm: "" });
-    setTimeout(() => setMessage(""), 3000);
+
+    const policyOk =
+      passwordChecks.minLength &&
+      passwordChecks.hasLower &&
+      passwordChecks.hasNumber &&
+      passwordChecks.hasSpecial;
+
+    if (!policyOk) {
+      setMessage({
+        type: "error",
+        text: "Password must be at least 8 characters and include lowercase, number, and special character.",
+      });
+      clearMessageSoon();
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await api.post("/users/me/password", {
+        newPassword: form.newPassword,
+        confirmPassword: form.confirmPassword,
+      });
+      setMessage({ type: "success", text: "Password changed successfully." });
+      setForm({ newPassword: "", confirmPassword: "" });
+      await loadProfile(); // refresh lastUpdatedAt
+      clearMessageSoon();
+    } catch (err) {
+      setMessage({ type: "error", text: err?.response?.data?.message || "Failed to change password." });
+      clearMessageSoon();
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
-    <div className="admin-profile">
-      <div className="profile-header">
-        <h1>Admin Profile</h1>
-        <Link to="/dashboard" className="back-link">← Back to Dashboard</Link>
+    <div className="adminProfilePage">
+      <div className="adminProfileTopbar">
+        <div className="adminProfileTitle">
+          <h1>
+            Profile <span className="adminProfileBadge">ReserveX Admin Portal</span>
+          </h1>
+          <p>Account details and security settings.</p>
+        </div>
+
+        <div className="adminProfileTopbarActions">
+          <Link to="/dashboard" className="apBtn apBtnSecondary">
+            Back to Dashboard
+          </Link>
+          <button
+            type="button"
+            className="apBtn apBtnDanger"
+              onClick={() => setShowLogoutModal(true)}
+          >
+            Sign Out
+          </button>
+        </div>
       </div>
 
       {message && (
-        <div className={`profile-message ${message.includes("success") ? "success" : "error"}`}>
-          {message}
+        <div className={`apAlert ${message.type === "success" ? "success" : "error"}`}>
+          {message.text}
         </div>
       )}
 
-      <div className="profile-section profile-picture-section">
-        <h2>Profile Picture</h2>
-        <div className="profile-picture-container">
-          <div className="profile-picture-wrapper">
-            {profilePicture ? (
-              <img src={profilePicture} alt="Admin" className="profile-picture" />
-            ) : (
-              <div className="profile-picture-placeholder">👤</div>
-            )}
+      <div className="adminProfileLayout">
+        <aside className="adminProfileCard">
+          <div className="adminProfileCardHeader">
+            <div className="adminProfileAvatar" aria-hidden="true">
+              {profile?.username?.slice(0, 1)?.toUpperCase() || "A"}
+            </div>
+            <div className="adminProfileCardMeta">
+              <div className="adminProfileName">
+                {profile?.username || user?.username || "—"}
+              </div>
+              <div className="adminProfileSub">
+                {profile?.email || user?.sub || "—"}
+              </div>
+              <div className="adminProfileRolePill">
+                {(profile?.role || user?.role || "EMPLOYEE").toString().replace("ROLE_", "")}
+              </div>
+                <div className="adminProfileStatusRow">
+                  <span className="adminProfileStatusDot" />
+                  <span className="adminProfileStatusText">Active</span>
+                </div>
+            </div>
           </div>
-          <div className="profile-picture-actions">
-            <label htmlFor="profile-pic-upload" className="btn btn-outline">
-              {profilePicture ? "Change Photo" : "Upload Photo"}
-            </label>
-            <input
-              id="profile-pic-upload"
-              type="file"
-              accept="image/*"
-              onChange={handlePictureChange}
-              className="profile-pic-input"
-            />
-            {profilePicture && (
-              <button type="button" className="btn btn-outline btn-remove-pic" onClick={handleRemovePicture}>
-                Remove
-              </button>
-            )}
+
+          <div className="adminProfileCardBody">
+            <div className="adminProfileKV">
+              <div className="k">Created at</div>
+              <div className="v">{formatDateTime(profile?.createdAt)}</div>
+            </div>
+            <div className="adminProfileKV">
+              <div className="k">Last updated</div>
+              <div className="v">{formatDateTime(profile?.lastUpdatedAt)}</div>
+            </div>
           </div>
-        </div>
+        </aside>
+
+        <main className="adminProfileMain">
+          <section className="apSection">
+            <div className="apSectionHeader">
+              <h2>Account Details</h2>
+              <p>Username and email are managed by super admins.</p>
+            </div>
+
+            <div className="apStack">
+              <div className="apField apFieldSpaced">
+                <label htmlFor="username">Username</label>
+                <input id="username" value={profile?.username || ""} readOnly />
+              </div>
+              <div className="apField apFieldSpaced">
+                <label htmlFor="email">Email</label>
+                <input id="email" value={profile?.email || ""} readOnly />
+              </div>
+            </div>
+
+            {loadingProfile && <div className="apHint">Loading profile…</div>}
+            {!loadingProfile && !profile && (
+              <div className="apHint apHintError">
+                Couldn’t load profile. Please try again.
+              </div>
+            )}
+          </section>
+
+          <section className="apSection">
+            <div className="apSectionHeader">
+              <h2>Change Password</h2>
+              <p>Use a strong password that you don’t reuse elsewhere.</p>
+            </div>
+
+            <form onSubmit={handleChangePassword} className="apForm">
+              <div className="apGrid2">
+                <div className="apField apSpan2">
+                  <label htmlFor="currentPassword">Current password</label>
+                  <input
+                    id="currentPassword"
+                    type="password"
+                    value="********"
+                    readOnly
+                  />
+                </div>
+
+                <div className="apField">
+                  <label htmlFor="newPassword">New password</label>
+                  <input
+                    id="newPassword"
+                    name="newPassword"
+                    type="password"
+                    value={form.newPassword}
+                    onChange={onChange}
+                    autoComplete="new-password"
+                    placeholder="New password"
+                    required
+                  />
+                </div>
+
+                <div className="apField">
+                  <label htmlFor="confirmPassword">Confirm new password</label>
+                  <input
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    type="password"
+                    value={form.confirmPassword}
+                    onChange={onChange}
+                    autoComplete="new-password"
+                    placeholder="Confirm new password"
+                    required
+                  />
+                </div>
+              </div>
+
+              {form.newPassword.length > 0 && (
+                <div className="apPolicy">
+                  <div className={`apPolicyItem ${passwordChecks.minLength ? "ok" : "bad"}`}>At least 8 characters</div>
+                  <div className={`apPolicyItem ${passwordChecks.hasLower ? "ok" : "bad"}`}>At least 1 lowercase letter</div>
+                  <div className={`apPolicyItem ${passwordChecks.hasNumber ? "ok" : "bad"}`}>At least 1 number</div>
+                  <div className={`apPolicyItem ${passwordChecks.hasSpecial ? "ok" : "bad"}`}>At least 1 special character</div>
+                  <div className={`apPolicyItem ${passwordChecks.matchesConfirm ? "ok" : "bad"}`}>Matches confirmation</div>
+                </div>
+              )}
+
+              <div className="apActions">
+                <button
+                  type="button"
+                  className="apBtn apBtnSecondary"
+                  onClick={() => {
+                    setForm({ newPassword: "", confirmPassword: "" });
+                    setMessage(null);
+                    loadProfile();
+                  }}
+                  disabled={submitting}
+                >
+                  Refresh
+                </button>
+                <button type="submit" className="apBtn apBtnPrimary" disabled={!canSubmit}>
+                  {submitting ? "Changing…" : "Change Password"}
+                </button>
+              </div>
+            </form>
+          </section>
+        </main>
       </div>
 
-      <div className="profile-section profile-update-section">
-        <div className="profile-forms-row">
-          <div className="profile-form-col">
-            <h2>Update Profile</h2>
-            <form id="profile-form" onSubmit={handleProfileSubmit} className="profile-form">
-              <div className="form-group">
-                <label htmlFor="name">Name</label>
-                <input
-                  type="text"
-                  id="name"
-                  name="name"
-                  value={profile.name}
-                  onChange={handleProfileChange}
-                />
-              </div>
-              <div className="form-group">
-                <label htmlFor="email">Email</label>
-                <input
-                  type="email"
-                  id="email"
-                  name="email"
-                  value={profile.email}
-                  onChange={handleProfileChange}
-                />
-              </div>
-              <button type="submit" className="btn btn-primary">Update Profile</button>
-            </form>
-          </div>
-          <div className="profile-form-col">
-            <h2>Change Password</h2>
-            <form id="password-form" onSubmit={handlePasswordSubmit} className="profile-form">
-              <div className="form-group">
-                <label htmlFor="current">Current Password</label>
-                <input
-                  type="password"
-                  id="current"
-                  name="current"
-                  value={password.current}
-                  onChange={handlePasswordChange}
-                  placeholder="Enter current password"
-                />
-              </div>
-              <div className="form-group">
-                <label htmlFor="new">New Password</label>
-                <input
-                  type="password"
-                  id="new"
-                  name="new"
-                  value={password.new}
-                  onChange={handlePasswordChange}
-                  placeholder="Enter new password"
-                />
-              </div>
-              <div className="form-group">
-                <label htmlFor="confirm">Confirm New Password</label>
-                <input
-                  type="password"
-                  id="confirm"
-                  name="confirm"
-                  value={password.confirm}
-                  onChange={handlePasswordChange}
-                  placeholder="Confirm new password"
-                />
-              </div>
-              <button type="submit" className="btn btn-primary">Change Password</button>
-            </form>
+      {showLogoutModal && (
+        <div
+          className="logout-modal-overlay"
+          onClick={() => setShowLogoutModal(false)}
+        >
+          <div
+            className="logout-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2>Confirm Logout</h2>
+            <p>Are you sure you want to logout?</p>
+            <div className="logout-modal-buttons">
+              <button
+                type="button"
+                className="logout-modal-btn confirm-btn"
+                onClick={() => {
+                  setShowLogoutModal(false);
+                  logout();
+                  navigate("/");
+                }}
+              >
+                Yes, Logout
+              </button>
+              <button
+                type="button"
+                className="logout-modal-btn cancel-btn"
+                onClick={() => setShowLogoutModal(false)}
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

@@ -1,10 +1,10 @@
 import React from "react";
-import { 
-  ShieldCheckIcon, 
-  CalendarDaysIcon, 
-  MapPinIcon, 
-  InformationCircleIcon, 
-  XMarkIcon 
+import {
+  ShieldCheckIcon,
+  CalendarDaysIcon,
+  MapPinIcon,
+  InformationCircleIcon,
+  XMarkIcon
 } from "@heroicons/react/24/outline";
 
 const ReservationModal = ({ isOpen, onClose, onConfirm, selectedStalls, isLoading }) => {
@@ -15,19 +15,19 @@ const ReservationModal = ({ isOpen, onClose, onConfirm, selectedStalls, isLoadin
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      
+
       {/* 1. Backdrop (Blurry & Dark) */}
-      <div 
-        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" 
+      <div
+        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
         onClick={onClose}
       ></div>
 
-      
+
       <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden animate-scale-up">
-        
+
 
         {/* Close Button (Top Right) */}
-        <button 
+        <button
           onClick={onClose}
           className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition"
         >
@@ -35,7 +35,7 @@ const ReservationModal = ({ isOpen, onClose, onConfirm, selectedStalls, isLoadin
         </button>
 
         <div className="p-8">
-          
+
           {/* Header Section */}
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-12 h-12 bg-blue-50 rounded-full mb-4">
@@ -48,34 +48,31 @@ const ReservationModal = ({ isOpen, onClose, onConfirm, selectedStalls, isLoadin
           </div>
 
           {/* Stall List Container */}
-          <div className="bg-slate-50 rounded-xl border border-slate-100 p-5 mb-6">
-            
-            <div className="flex justify-between text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
+          <div className="bg-slate-50/50 rounded-2xl border border-slate-100 p-6 mb-8">
+
+            <div className="flex justify-between text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-4 px-1">
               <span>Stall Details</span>
               <span>Amount</span>
             </div>
 
-            <div className="space-y-3 mb-4">
+            <div className="space-y-3 mb-5">
               {selectedStalls.map((stall) => (
-                <div key={stall.id} className="flex justify-between items-center bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
-                  <div className="flex items-center gap-3">
+                <div key={stall.id} className="flex justify-between items-start bg-white p-4 rounded-xl border border-slate-200/60 shadow-[0_2px_8px_rgb(0,0,0,0.04)]">
+                  <div className="flex items-start gap-4">
                     {/* ID Badge */}
-                    <div className="w-8 h-8 rounded bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-sm p-3">
-                      {stall?.id} 
+                    <div className="w-10 h-10 rounded-lg bg-blue-50/80 text-blue-700 font-extrabold flex items-center justify-center text-sm shrink-0 border border-blue-100/50">
+                      {stall?.name}
                     </div>
                     <div>
-                      <p className="font-semibold text-slate-700 text-sm">{stall.stall_name}</p>
-                      <p className="text-xs text-slate-400">{stall?.description}</p>
+                      <p className="font-bold text-slate-800 text-sm leading-none mb-1.5">{stall.name} <span className="font-normal text-slate-400">({stall.size})</span></p>
+                      <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed max-w-[200px]">{stall?.description || "Standard exhibition space."}</p>
                     </div>
                   </div>
-                  
-                  <div className="flex items-center gap-3">
-                     <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded border border-slate-200 uppercase font-medium">
-                        {stall.size}
-                     </span>
-                     <span className="font-semibold text-slate-700 text-sm">
-                        Rs. {stall.price.toLocaleString()}
-                     </span>
+
+                  <div className="flex flex-col items-end gap-1.5 mt-0.5">
+                    <span className="font-bold text-slate-800 text-sm">
+                      Rs. {stall.price.toLocaleString()}
+                    </span>
                   </div>
                 </div>
               ))}
@@ -89,7 +86,7 @@ const ReservationModal = ({ isOpen, onClose, onConfirm, selectedStalls, isLoadin
               </span>
             </div>
           </div>
-        
+
 
           {/* Footer Note */}
           <div className="flex gap-2 text-sm text-slate-400 mb-8 bg-blue-50/50 p-3 rounded-lg">
@@ -101,14 +98,14 @@ const ReservationModal = ({ isOpen, onClose, onConfirm, selectedStalls, isLoadin
 
           {/* Action Buttons */}
           <div className="flex gap-3">
-            <button 
+            <button
               onClick={onClose}
               disabled={isLoading}
               className="flex-1 py-3.5 border border-slate-200 text-slate-600 font-semibold rounded-xl hover:bg-slate-50 transition text-sm"
             >
               Modify Selection
             </button>
-            <button 
+            <button
               onClick={onConfirm}
               disabled={isLoading}
               className="flex-1 py-3.5 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition shadow-lg shadow-blue-200 flex justify-center items-center gap-2 text-sm"

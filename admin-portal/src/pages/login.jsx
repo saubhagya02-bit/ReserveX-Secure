@@ -4,7 +4,7 @@ import { AuthContext } from '../contexts/AuthContext';
 
 const Login = () => {
     // State to hold user input
-    const [credentials, setCredentials] = useState({ username: '', password: '' });
+    const [credentials, setCredentials] = useState({ email: '', password: '' });
     
     // State to handle UI feedback (errors and loading spinner)
     const [error, setError] = useState('');
@@ -31,15 +31,16 @@ const Login = () => {
 
         try {
             // Call the login function from AuthContext
-            const success = await login(credentials.username, credentials.password);
+            const success = await login(credentials.email, credentials.password);
             
             if (success) {
                 // Redirect to the Dashboard on success
                 navigate('/dashboard');
             } else {
-                setError('Invalid username or password.');
+                setError('Invalid email or password.');
             }
         } catch (err) {
+            console.error('Login error:', err);
             setError('Server error. Please try again later.');
         } finally {
             setLoading(false); // Re-enable button
@@ -49,23 +50,32 @@ const Login = () => {
     return (
         <div style={styles.container}>
             <div style={styles.card}>
-                <h2 style={styles.title}>Admin Portal</h2>
-                <p style={styles.subtitle}>Colombo International Bookfair</p>
+                <div style={styles.headerContainer}>
+                    <img 
+                        src="/logo.jpeg" 
+                        alt="Logo" 
+                        style={styles.logo}
+                    />
+                    <div>
+                        <h2 style={styles.title}>Admin Portal</h2>
+                        <p style={styles.subtitle}>Colombo International Bookfair</p>
+                    </div>
+                </div>
                 
                 {/* Error Message Display */}
                 {error && <div style={styles.error}>{error}</div>}
 
                 <form onSubmit={handleSubmit} style={styles.form}>
                     <div style={styles.inputGroup}>
-                        <label style={styles.label}>Username</label>
+                        <label style={styles.label}>Email Address</label>
                         <input
-                            type="text"
-                            name="username"
-                            value={credentials.username}
+                            type="email"
+                            name="email"
+                            value={credentials.email}
                             onChange={handleChange}
                             style={styles.input}
                             required
-                            placeholder="Enter admin ID"
+                            placeholder="admin@example.com"
                         />
                     </div>
 
@@ -113,6 +123,18 @@ const styles = {
         borderRadius: '8px',
         boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
         textAlign: 'center',
+    },
+    headerContainer: {
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '15px',
+        marginBottom: '25px',
+    },
+    logo: {
+        height: '50px',
+        width: 'auto',
+        objectFit: 'contain',
     },
     title: {
         margin: '0 0 5px 0',

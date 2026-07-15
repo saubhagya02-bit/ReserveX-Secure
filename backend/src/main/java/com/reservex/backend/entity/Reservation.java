@@ -20,7 +20,7 @@ public class Reservation {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "reservation_id")
-    private Long id;
+    private Integer id;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
@@ -46,6 +46,9 @@ public class Reservation {
     @Column(name = "qr_code_path")
     private String qrCodeToken;
 
+    @OneToMany(mappedBy = "reservation", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<ReservationGenre> reservationGenres = new HashSet<>();
+
     public enum Status {
         Pending,
         Approved,
@@ -57,7 +60,13 @@ public class Reservation {
         if (reservationDate == null) reservationDate = Instant.now();
         // You can store a token OR a file path in qr_code_path.
         // If you're storing a token, generate it here:
+
         if (qrCodeToken == null) qrCodeToken = UUID.randomUUID().toString();
         if (status == null) status = Status.Pending;
+
+        if (qrCodePath == null) qrCodePath = UUID.randomUUID().toString();
+        if (status == null) status = Status.Approved;
+
     }
+
 }

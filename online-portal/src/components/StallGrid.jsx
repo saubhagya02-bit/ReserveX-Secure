@@ -1,15 +1,16 @@
 import React from "react";
 
-const StallGrid = ({ 
-  stalls, 
-  isLoading, 
+const StallGrid = ({
+  stalls,
+  isLoading,
   totalRows,
-  selectedStalls, 
-  handleStallClick, 
-  handleMouseEnter, 
-  handleMouseMove, 
-  handleMouseLeave, 
-  setHoveredStall 
+  selectedStalls,
+  handleStallClick,
+  handleMouseEnter,
+  handleMouseMove,
+  handleMouseLeave,
+  setHoveredStall,
+  activeFilter
 }) => {
 
   //LOADING STATE
@@ -22,7 +23,7 @@ const StallGrid = ({
     );
   }
 
-  
+
 
   //EMPTY STATE
   if (!stalls || stalls.length === 0) {
@@ -42,7 +43,7 @@ const StallGrid = ({
         bg-[image:linear-gradient(to_right,#e2e8f0_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f0_1px,transparent_1px)] 
         bg-[size:58px_58px] 
         lg:bg-[size:70px_70px] 
-        border-t border-l border-slate-200" 
+        border-t border-l border-slate-200"
       style={{
         gridAutoColumns: "50px",  // Width of 1 small block
         gridAutoRows: "50px",     // Height of 1 small block
@@ -56,7 +57,7 @@ const StallGrid = ({
           <div
             key={`row-label-${index}`}
             style={{
-              gridColumnStart: 1, 
+              gridColumnStart: 1,
               gridRowStart: index + 1,
             }}
             className="flex items-center justify-center font-bold text-slate-400 lg:text-lg"
@@ -68,34 +69,41 @@ const StallGrid = ({
 
       {/* STALL CARDS */}
       {stalls.map((stall) => {
-        const isReserved = stall?.isConfirmed === 1;
+        const isReserved = stall?.Confirmed === true;
         const isSelected = selectedStalls.some((s) => s.id === stall.id);
 
+        let isDimmed = false;
+        if (activeFilter === "AVAILABLE" && isReserved) isDimmed = true;
+        if (activeFilter === "SMALL" && stall.size?.toUpperCase() !== "SMALL") isDimmed = true;
+        if (activeFilter === "MEDIUM" && stall.size?.toUpperCase() !== "MEDIUM") isDimmed = true;
+        if (activeFilter === "LARGE" && stall.size?.toUpperCase() !== "LARGE") isDimmed = true;
+
         return (
-          <div 
+          <div
             key={stall.id}
             onClick={() => handleStallClick(stall)}
             onMouseEnter={(e) => handleMouseEnter(stall, e)}
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
-            onTouchStart={() => setHoveredStall(stall)} 
+            onTouchStart={() => setHoveredStall(stall)}
             style={{
               // Your exact mapping
               gridColumnStart: stall?.gridRow + 1,
               gridRowStart: stall?.gridCol
             }}
             className={`
-              ${isReserved 
+              ${isReserved
                 ? "bg-slate-200 text-slate-400 border-slate-500 border "
-                : isSelected 
+                : isSelected
                   ? "bg-blue-600 text-white border-blue-700 shadow-lg scale-105 z-10"
                   : "bg-green-100 text-green-800 border border-green-400 hover:bg-green-500 hover:text-white cursor-pointer hover:shadow-md hover:scale-105"
               }
+              ${isDimmed && !isSelected ? "opacity-20 grayscale pointer-events-none" : "opacity-100"}
               w-full h-full rounded-lg
-              flex flex-col items-center justify-center text-xs font-bold transition-all shadow-sm`
+              flex flex-col items-center justify-center text-xs font-bold transition-all shadow-sm duration-300`
             }
           >
-            <span className="font-bold text-sm md:text-base leading-none mb-1">{stall.id}</span>
+            <span className="font-bold text-sm md:text-base leading-none mb-1">{stall.name}</span>
             <span className="opacity-80 uppercase font-normal">{stall.size}</span>
           </div>
         );

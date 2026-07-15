@@ -1,3 +1,7 @@
+// Register/login endpoints
+// Returns JWT (token) after login
+
+
 package com.reservex.backend.controllers;
 
 import com.reservex.backend.dto.LoginRequest;
@@ -33,13 +37,17 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
         try {
+
             LoginResponse response = authService.login(request.getEmail(), request.getPassword());
+
+            JwtResponse response = authService.login(request.getEmail(), request.getPassword());
+
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorMessage("Invalid credentials"));
         }
     }
 
-    public record RegisterResponse(Long id, String email, String businessName) {}
+    public record RegisterResponse(Integer id, String email, String businessName) {}
     public record ErrorMessage(String message) {}
 }
