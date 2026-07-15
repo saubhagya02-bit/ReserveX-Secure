@@ -19,13 +19,8 @@ export const getAllGenres = async () => {
 /**
  * Get literary genres added by the current user for the exhibition.
  */
-
-export const getAllGenres = async () => {
-  const { data } = await API.get("/genres");
-
 export const getMyGenres = async () => {
   const { data } = await api.get("/genres");
-
   return data;
 };
 
