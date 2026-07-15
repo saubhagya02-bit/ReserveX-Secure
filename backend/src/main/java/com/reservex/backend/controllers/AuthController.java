@@ -4,8 +4,8 @@
 
 package com.reservex.backend.controllers;
 
-import com.reservex.backend.dto.JwtResponse;
 import com.reservex.backend.dto.LoginRequest;
+import com.reservex.backend.dto.LoginResponse;
 import com.reservex.backend.dto.RegisterRequest;
 import com.reservex.backend.entity.User;
 import com.reservex.backend.services.AuthService;
@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
+@CrossOrigin(origins = {"http://localhost:5173", "http://localhost:3000"})
 public class AuthController {
 
     private final AuthService authService;
@@ -36,7 +37,11 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
         try {
+
+            LoginResponse response = authService.login(request.getEmail(), request.getPassword());
+
             JwtResponse response = authService.login(request.getEmail(), request.getPassword());
+
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorMessage("Invalid credentials"));

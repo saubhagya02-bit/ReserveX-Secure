@@ -19,7 +19,9 @@ public class RegisterRequest {
     @NotBlank(message = "Business name is required")
     private String businessName;
 
+
     @NotBlank(message = "Username is required")
     private String username;
+
 
 }

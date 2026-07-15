@@ -8,8 +8,12 @@ import lombok.Data;
 public class LoginRequest {
 
     @NotBlank
+
+    private String email; // email for vendors
+
     @JsonAlias("username") // backward compatibility with older clients
     private String email;
+
 
     @NotBlank
     private String password;

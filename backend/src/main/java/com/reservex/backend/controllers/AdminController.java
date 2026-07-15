@@ -1,3 +1,7 @@
+
+package com.reservex.backend.controllers;
+
+
 // Admin endpoints to view all stalls and reservations
 
 package com.reservex.backend.controllers;

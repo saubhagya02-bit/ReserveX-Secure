@@ -37,7 +37,7 @@ const RegisterPage = () => {
 
     try {
       const response = await registerUser(formData);
-      toast.success(response.message || "Account created! Please login.")
+      toast.success("Account created! Please login.")
       navigate("/login");
 
     } catch (error) {
@@ -84,7 +84,10 @@ const RegisterPage = () => {
                 </span>
                 <input
                   type="text"
+                  name="BuissnesName"
+
                   name="business_name"
+
                   placeholder="Business Name (e.g. Sarasavi Publishers)"
                   onChange={handleChange}
                   required

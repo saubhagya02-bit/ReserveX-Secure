@@ -28,6 +28,15 @@ export const loginUser = async (email, password) => {
   // }
 
   try {
+
+    const res = await api.post("/auth/login", { email, password });
+    const { token, user } = res.data;
+    if (token) {
+      localStorage.setItem("jwt_token", token);
+      localStorage.setItem("user_data", JSON.stringify(user));
+    }
+    return {token,user};
+
     const res = await api.post("/auth/login", {  username : email, password });
     const { token, user } = res.data;
     if (token) {
@@ -36,8 +45,9 @@ export const loginUser = async (email, password) => {
     }
     return res.data;
 
+
   } catch (err) {
-    console.error("loginUser error:", err);
+    console.error("Auth Service error:", err);
     throw err?.response?.data?.message || "Login failed";
   }
 };
@@ -54,6 +64,9 @@ export const registerUser = async (userData) => {
       businessName: userData.business_name,  // map snake to camel
       username: userData.username || userData.email
     });
+
+    console.log("res", res);
+
     return res.data;
   } catch (err) {
     console.error("registerUser error:", err);
@@ -62,6 +75,10 @@ export const registerUser = async (userData) => {
 };
 
 export const logout = () => {
+
+  localStorage.removeItem("jwt_token");
+  localStorage.removeItem("user_data");
+
   localStorage.removeItem("token");
   localStorage.removeItem("user");
 };
@@ -74,4 +91,5 @@ export const getCurrentUser = async () => {
     console.error("getCurrentUser error:", err);
     throw err?.response?.data?.message || "Failed to fetch user data";
   }
+
 };

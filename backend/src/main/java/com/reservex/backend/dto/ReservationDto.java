@@ -15,6 +15,33 @@ import java.util.stream.Collectors;
 @Builder
 public class ReservationDto {
 
+
+    private Long id;
+    private String qrCodeToken;
+    private Instant createdAt;
+    private List<ReservationStallDto> stalls;
+
+    public static ReservationDto fromEntity(Reservation r) {
+        List<ReservationStallDto> stallDtos = r.getStalls().stream()
+                .map(ReservationDto::toStallDto)
+                .collect(Collectors.toList());
+
+        return ReservationDto.builder()
+                .id(r.getId())
+                .qrCodeToken(r.getQrCodeToken())
+                .createdAt(r.getReservationDate())
+                .stalls(stallDtos)
+                .build();
+    }
+
+    private static ReservationStallDto toStallDto(Stall s) {
+        return ReservationStallDto.builder()
+                .id(s.getId())
+                .name(s.getName())
+                .size(s.getSize().name())
+                .build();
+    }
+
         private Integer id;
         private String qrCodeToken;
         private Instant reservationDate;
@@ -55,4 +82,5 @@ public class ReservationDto {
                                 .genres(stallGenres)
                                 .build();
         }
+
 }

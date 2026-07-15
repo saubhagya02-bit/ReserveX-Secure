@@ -58,6 +58,7 @@ public class User {
     protected void onCreate() {
         if (createdAt == null)
             createdAt = Instant.now();
+
         if (lastUpdatedAt == null)
             lastUpdatedAt = createdAt; // if never updated, keep same as createdAt
     }
@@ -65,5 +66,6 @@ public class User {
     @PreUpdate
     protected void onUpdate() {
         lastUpdatedAt = Instant.now();
+
     }
 }
