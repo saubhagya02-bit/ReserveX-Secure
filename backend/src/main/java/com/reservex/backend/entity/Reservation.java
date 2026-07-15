@@ -44,7 +44,7 @@ public class Reservation {
     private Status status;
 
     @Column(name = "qr_code_path")
-    private String qrCodeToken;
+    private String qrCodePath;
 
     @OneToMany(mappedBy = "reservation", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<ReservationGenre> reservationGenres = new HashSet<>();
@@ -52,7 +52,7 @@ public class Reservation {
     public enum Status {
         Pending,
         Approved,
-        Rejected 
+        Rejected
     }
 
     @PrePersist
@@ -60,13 +60,8 @@ public class Reservation {
         if (reservationDate == null) reservationDate = Instant.now();
         // You can store a token OR a file path in qr_code_path.
         // If you're storing a token, generate it here:
-
-        if (qrCodeToken == null) qrCodeToken = UUID.randomUUID().toString();
-        if (status == null) status = Status.Pending;
-
         if (qrCodePath == null) qrCodePath = UUID.randomUUID().toString();
         if (status == null) status = Status.Approved;
-
     }
 
 }

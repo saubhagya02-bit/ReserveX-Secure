@@ -17,153 +17,125 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class EmailService {
 
-
     private final JavaMailSender mailSender;
     private final QrCodeService qrCodeService;
 
     @Value("${spring.mail.username:}")
     private String fromEmail;
 
-    @Async
     public void sendReservationConfirmation(User user, Reservation reservation) {
         if (fromEmail == null || fromEmail.isBlank()) {
+            System.out.println(">>> Email not configured. Skipping email send.");
             return; // skip if mail not configured
         }
+
         try {
-            byte[] qrBytes = qrCodeService.generateQrCodeForReservation(reservation.getQrCodeToken());
+            System.out.println(">>> Generating QR code for reservation ID: " + reservation.getId());
+
+            // Ensure reservation ID is not null
+            if (reservation.getId() == null) {
+                System.err.println(">>> ERROR: Reservation ID is null! Cannot generate QR code.");
+                return;
+            }
+
+            // Generate QR code with reservation details
+            byte[] qrBytes = qrCodeService.generateQrCodeForReservationWithDetails(
+                    reservation.getId(),
+                    reservation.getQrCodePath(),
+                    user.getBusinessName() != null ? user.getBusinessName() : user.getUsername()
+            );
+
+            System.out.println(">>> QR code generated successfully. Size: " + qrBytes.length + " bytes");
+
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromEmail);
             helper.setTo(user.getEmail());
             helper.setSubject("Colombo International Book Fair - Stall Reservation Confirmed");
+
             String body = buildConfirmationBody(user, reservation);
             helper.setText(body, true);
-            helper.addAttachment("reservation-qr.png", new org.springframework.core.io.ByteArrayResource(qrBytes));
+
+            // Attach QR code as a downloadable PNG file with proper filename
+            String qrFileName = "reservation-qr-" + reservation.getId() + ".png";
+            org.springframework.core.io.ByteArrayResource qrResource =
+                    new org.springframework.core.io.ByteArrayResource(qrBytes) {
+                        @Override
+                        public String getFilename() {
+                            return qrFileName;
+                        }
+                    };
+
+            helper.addAttachment(qrFileName, qrResource, "image/png");
+
+            System.out.println(">>> Sending email to: " + user.getEmail() + " with QR attachment: " + qrFileName);
+            mailSender.send(message);
+            System.out.println(">>> Email sent successfully!");
+
+        } catch (MessagingException e) {
+            System.err.println(">>> Failed to send confirmation email (MessagingException): " + e.getMessage());
+            e.printStackTrace();
+        } catch (Exception e) {
+            System.err.println(">>> Unexpected error sending confirmation email: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    public void sendStallDeletionNotification(User user, String stallName, int currentBookings,
+                                              boolean reservationCancelled) {
+        if (fromEmail == null || fromEmail.isBlank())
+            return;
+
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromEmail);
+            helper.setTo(user.getEmail());
+            helper.setSubject("Colombo International Book Fair - Stall Deleted from Your Reservation");
+            String body = buildStallDeletionBody(user, stallName, currentBookings, reservationCancelled);
+            helper.setText(body, true);
             mailSender.send(message);
         } catch (MessagingException e) {
-            throw new RuntimeException("Failed to send confirmation email", e);
+            // Log the error but don't throw to avoid transaction rollback
+            System.err.println("Failed to send stall deletion email to " + user.getEmail() + ": " + e.getMessage());
+        }
+    }
+
+    public void sendStallUnreserveNotification(User user, String stallName, int currentBookings,
+                                               boolean reservationCancelled) {
+        if (fromEmail == null || fromEmail.isBlank())
+            return;
+
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromEmail);
+            helper.setTo(user.getEmail());
+            helper.setSubject("Colombo International Book Fair - Stall Unreserved from Your Booking");
+            String body = buildStallUnreserveBody(user, stallName, currentBookings, reservationCancelled);
+            helper.setText(body, true);
+            mailSender.send(message);
+        } catch (MessagingException e) {
+            // Log the error but don't throw to avoid transaction rollback
+            System.err.println("Failed to send stall unreserve email to " + user.getEmail() + ": " + e.getMessage());
+        }
+    }
+
+    private String buildStallDeletionBody(User user, String stallName, int currentBookings,
+                                          boolean reservationCancelled) {
+        String reason = "The stall \"" + stallName + "\" has been removed from the exhibition by the administrator.";
+        String statusMsg;
+        String additionalInfo;
+
+        if (reservationCancelled) {
+            statusMsg = "Your reservation has been <strong>cancelled</strong> because this was the only stall in your reservation.";
+            additionalInfo = "<p style=\"color: #2563eb; font-weight: 600; margin-top: 16px;\">📌 You can book again at any time through the Publisher Portal.</p>";
+        } else {
+            statusMsg = "Your reservation is still active. Your current number of reserved stalls is now <strong>" + currentBookings + "</strong>.";
+            additionalInfo = "<p style=\"color: #059669; font-weight: 600; margin-top: 16px;\">✓ Your remaining stalls are still confirmed.</p>";
         }
 
-  private final JavaMailSender mailSender;
-  private final QrCodeService qrCodeService;
-
-  @Value("${spring.mail.username:}")
-  private String fromEmail;
-
-  public void sendReservationConfirmation(User user, Reservation reservation) {
-    if (fromEmail == null || fromEmail.isBlank()) {
-      System.out.println(">>> Email not configured. Skipping email send.");
-      return; // skip if mail not configured
-    }
-
-    try {
-      System.out.println(">>> Generating QR code for reservation ID: " + reservation.getId());
-      
-      // Ensure reservation ID is not null
-      if (reservation.getId() == null) {
-        System.err.println(">>> ERROR: Reservation ID is null! Cannot generate QR code.");
-        return;
-      }
-      
-      // Generate QR code with reservation details
-      byte[] qrBytes = qrCodeService.generateQrCodeForReservationWithDetails(
-          reservation.getId(),
-          reservation.getQrCodePath(),
-          user.getBusinessName() != null ? user.getBusinessName() : user.getUsername()
-      );
-      
-      System.out.println(">>> QR code generated successfully. Size: " + qrBytes.length + " bytes");
-      
-      MimeMessage message = mailSender.createMimeMessage();
-      MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-      helper.setFrom(fromEmail);
-      helper.setTo(user.getEmail());
-      helper.setSubject("Colombo International Book Fair - Stall Reservation Confirmed");
-      
-      String body = buildConfirmationBody(user, reservation);
-      helper.setText(body, true);
-      
-      // Attach QR code as a downloadable PNG file with proper filename
-      String qrFileName = "reservation-qr-" + reservation.getId() + ".png";
-      org.springframework.core.io.ByteArrayResource qrResource = 
-          new org.springframework.core.io.ByteArrayResource(qrBytes) {
-            @Override
-            public String getFilename() {
-              return qrFileName;
-            }
-          };
-      
-      helper.addAttachment(qrFileName, qrResource, "image/png");
-      
-      System.out.println(">>> Sending email to: " + user.getEmail() + " with QR attachment: " + qrFileName);
-      mailSender.send(message);
-      System.out.println(">>> Email sent successfully!");
-      
-    } catch (MessagingException e) {
-      System.err.println(">>> Failed to send confirmation email (MessagingException): " + e.getMessage());
-      e.printStackTrace();
-    } catch (Exception e) {
-      System.err.println(">>> Unexpected error sending confirmation email: " + e.getMessage());
-      e.printStackTrace();
-    }
-  }
-
-  public void sendStallDeletionNotification(User user, String stallName, int currentBookings,
-      boolean reservationCancelled) {
-    if (fromEmail == null || fromEmail.isBlank())
-      return;
-
-    try {
-      MimeMessage message = mailSender.createMimeMessage();
-      MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-      helper.setFrom(fromEmail);
-      helper.setTo(user.getEmail());
-      helper.setSubject("Colombo International Book Fair - Stall Deleted from Your Reservation");
-      String body = buildStallDeletionBody(user, stallName, currentBookings, reservationCancelled);
-      helper.setText(body, true);
-      mailSender.send(message);
-    } catch (MessagingException e) {
-      // Log the error but don't throw to avoid transaction rollback
-      System.err.println("Failed to send stall deletion email to " + user.getEmail() + ": " + e.getMessage());
-    }
-  }
-
-  public void sendStallUnreserveNotification(User user, String stallName, int currentBookings,
-      boolean reservationCancelled) {
-    if (fromEmail == null || fromEmail.isBlank())
-      return;
-
-    try {
-      MimeMessage message = mailSender.createMimeMessage();
-      MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-      helper.setFrom(fromEmail);
-      helper.setTo(user.getEmail());
-      helper.setSubject("Colombo International Book Fair - Stall Unreserved from Your Booking");
-      String body = buildStallUnreserveBody(user, stallName, currentBookings, reservationCancelled);
-      helper.setText(body, true);
-      mailSender.send(message);
-    } catch (MessagingException e) {
-      // Log the error but don't throw to avoid transaction rollback
-      System.err.println("Failed to send stall unreserve email to " + user.getEmail() + ": " + e.getMessage());
-    }
-  }
-
-  private String buildStallDeletionBody(User user, String stallName, int currentBookings,
-      boolean reservationCancelled) {
-    String reason = "The stall \"" + stallName + "\" has been removed from the exhibition by the administrator.";
-    String statusMsg;
-    String additionalInfo;
-    
-    if (reservationCancelled) {
-      statusMsg = "Your reservation has been <strong>cancelled</strong> because this was the only stall in your reservation.";
-      additionalInfo = "<p style=\"color: #2563eb; font-weight: 600; margin-top: 16px;\">📌 You can book again at any time through the Publisher Portal.</p>";
-    } else {
-      statusMsg = "Your reservation is still active. Your current number of reserved stalls is now <strong>" + currentBookings + "</strong>.";
-      additionalInfo = "<p style=\"color: #059669; font-weight: 600; margin-top: 16px;\">✓ Your remaining stalls are still confirmed.</p>";
-
-    }
-    
-    return """
+        return """
         <!DOCTYPE html>
         <html>
         <head>
@@ -213,54 +185,28 @@ public class EmailService {
         </body>
         </html>
         """.formatted(
-        user.getBusinessName() != null ? user.getBusinessName() : "Vendor",
-        stallName,
-        reason,
-        statusMsg,
-        additionalInfo);
-  }
-
-
-    private String buildConfirmationBody(User user, Reservation reservation) {
-        String stallInfo = reservation.getStalls().isEmpty()
-                ? "Stall"
-                : reservation.getStalls().stream()
-                        .map(s -> s.getName() + " (" + s.getSize() + ")")
-                        .reduce((a, b) -> a + ", " + b)
-                        .orElse("Stall");
-        return """
-            <h2>Stall Reservation Confirmed</h2>
-            <p>Dear %s,</p>
-            <p>Your stall reservation for the Colombo International Book Fair has been confirmed.</p>
-            <p><strong>Business:</strong> %s</p>
-            <p><strong>Stalls:</strong> %s</p>
-            <p><strong>Reservation ID:</strong> %s</p>
-            <p>Please find your unique QR code attached. This QR code acts as your pass to enter the exhibition premises. Keep it safe and present it at the venue.</p>
-            <p>Thank you for participating in the Colombo International Book Fair.</p>
-            <p>— Sri Lanka Book Publishers' Association</p>
-            """.formatted(
-                user.getBusinessName(),
-                user.getBusinessName(),
-                stallInfo,
-                reservation.getQrCodeToken()
-        );
-
-  private String buildStallUnreserveBody(User user, String stallName, int currentBookings,
-      boolean reservationCancelled) {
-    String reason = "The stall \"" + stallName + "\" has been unreserved by the administrator and is now available for other vendors.";
-    String statusMsg;
-    String additionalInfo;
-    
-    if (reservationCancelled) {
-      statusMsg = "Your reservation has been <strong>cancelled</strong> because this was the only stall in your reservation.";
-      additionalInfo = "<p style=\"color: #2563eb; font-weight: 600; margin-top: 16px;\">📌 You can book again at any time through the Publisher Portal.</p>";
-    } else {
-      statusMsg = "Your reservation is still active. Your current number of reserved stalls is now <strong>" + currentBookings + "</strong>.";
-      additionalInfo = "<p style=\"color: #059669; font-weight: 600; margin-top: 16px;\">✓ Your remaining stalls are still confirmed.</p>";
-
+                user.getBusinessName() != null ? user.getBusinessName() : "Vendor",
+                stallName,
+                reason,
+                statusMsg,
+                additionalInfo);
     }
-    
-    return """
+
+    private String buildStallUnreserveBody(User user, String stallName, int currentBookings,
+                                           boolean reservationCancelled) {
+        String reason = "The stall \"" + stallName + "\" has been unreserved by the administrator and is now available for other vendors.";
+        String statusMsg;
+        String additionalInfo;
+
+        if (reservationCancelled) {
+            statusMsg = "Your reservation has been <strong>cancelled</strong> because this was the only stall in your reservation.";
+            additionalInfo = "<p style=\"color: #2563eb; font-weight: 600; margin-top: 16px;\">📌 You can book again at any time through the Publisher Portal.</p>";
+        } else {
+            statusMsg = "Your reservation is still active. Your current number of reserved stalls is now <strong>" + currentBookings + "</strong>.";
+            additionalInfo = "<p style=\"color: #059669; font-weight: 600; margin-top: 16px;\">✓ Your remaining stalls are still confirmed.</p>";
+        }
+
+        return """
         <!DOCTYPE html>
         <html>
         <head>
@@ -310,23 +256,23 @@ public class EmailService {
         </body>
         </html>
         """.formatted(
-        user.getBusinessName() != null ? user.getBusinessName() : "Vendor",
-        stallName,
-        reason,
-        statusMsg,
-        additionalInfo);
-  }
+                user.getBusinessName() != null ? user.getBusinessName() : "Vendor",
+                stallName,
+                reason,
+                statusMsg,
+                additionalInfo);
+    }
 
-  private String buildConfirmationBody(User user, Reservation reservation) {
-    // Build stall list
-    StringBuilder stallList = new StringBuilder();
-    reservation.getStalls().forEach(s -> stallList.append(
-        "<li style=\"padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #334155; font-size: 15px;\">")
-        .append("<span style=\"font-weight: 600; color: #0f172a;\">").append(s.getName()).append("</span>")
-        .append(" <span style=\"color: #64748b; font-size: 13px;\">(").append(s.getSize()).append(")</span>")
-        .append("</li>"));
+    private String buildConfirmationBody(User user, Reservation reservation) {
+        // Build stall list
+        StringBuilder stallList = new StringBuilder();
+        reservation.getStalls().forEach(s -> stallList.append(
+                        "<li style=\"padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #334155; font-size: 15px;\">")
+                .append("<span style=\"font-weight: 600; color: #0f172a;\">").append(s.getName()).append("</span>")
+                .append(" <span style=\"color: #64748b; font-size: 13px;\">(").append(s.getSize()).append(")</span>")
+                .append("</li>"));
 
-    return """
+        return """
         <!DOCTYPE html>
         <html>
         <head>
@@ -378,30 +324,30 @@ public class EmailService {
         </body>
         </html>
         """
-        .formatted(
-            user.getBusinessName() != null ? user.getBusinessName() : "Vendor",
-            user.getBusinessName() != null ? user.getBusinessName() : "N/A",
-            stallList.toString(),
-            reservation.getQrCodePath());
-  }
-
-  @Async
-  public void sendContactUsEmail(ContactRequest request) {
-    SimpleMailMessage mailMessage = new SimpleMailMessage();
-
-    if (fromEmail == null || fromEmail.isBlank()) {
-      return;
+                .formatted(
+                        user.getBusinessName() != null ? user.getBusinessName() : "Vendor",
+                        user.getBusinessName() != null ? user.getBusinessName() : "N/A",
+                        stallList.toString(),
+                        reservation.getQrCodePath());
     }
 
-    mailMessage.setTo(fromEmail);
+    @Async
+    public void sendContactUsEmail(ContactRequest request) {
+        SimpleMailMessage mailMessage = new SimpleMailMessage();
 
-    mailMessage.setSubject("New Contact Form Submission from: " + request.getName());
-    mailMessage.setText(
-        "You have a new message from the ReserveX Contact Page.\n\n" +
-            "Name: " + request.getName() + "\n" +
-            "Email: " + request.getEmail() + "\n\n" +
-            "Message:\n" + request.getMessage());
+        if (fromEmail == null || fromEmail.isBlank()) {
+            return;
+        }
 
-    mailSender.send(mailMessage);
-  }
+        mailMessage.setTo(fromEmail);
+
+        mailMessage.setSubject("New Contact Form Submission from: " + request.getName());
+        mailMessage.setText(
+                "You have a new message from the ReserveX Contact Page.\n\n" +
+                        "Name: " + request.getName() + "\n" +
+                        "Email: " + request.getEmail() + "\n\n" +
+                        "Message:\n" + request.getMessage());
+
+        mailSender.send(mailMessage);
+    }
 }

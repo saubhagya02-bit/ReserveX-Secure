@@ -1,7 +1,3 @@
-// Reserve stall(s) endpoint
-// “My reservations” endpoint
-
-
 package com.reservex.backend.controllers;
 
 import com.reservex.backend.config.UserPrincipal;
@@ -24,44 +20,97 @@ public class ReservationController {
 
     private final ReservationService reservationService;
     private final ReservationGenreService genreService;
+
+
+    // Reserve stall(s)
     @PostMapping
     public ResponseEntity<?> createReservation(
             @AuthenticationPrincipal UserPrincipal principal,
             @RequestBody Map<String, Object> body) {
+
         try {
 
             // Frontend sends stall_ids (snake_case); also accept stallIds
-            @SuppressWarnings("unchecked")
-            List<?> rawList = (List<?>) (body.get("stall_ids") != null ? body.get("stall_ids") : body.get("stallIds"));
-            if (rawList != null && !rawList.isEmpty()) {
-                List<Long> stallIds = rawList.stream()
-                        .map(id -> id instanceof Number n ? n.longValue() : Long.parseLong(id.toString()))
+            Object stallIdsObj = body.get("stall_ids") != null
+                    ? body.get("stall_ids")
+                    : body.get("stallIds");
 
-            if (body.get("stallIds") != null || body.get("stall_ids") != null) {
+
+            // Multiple stall reservation
+            if (stallIdsObj != null) {
+
                 @SuppressWarnings("unchecked")
-                List<?> rawList = (List<?>) (body.get("stall_ids") != null ? body.get("stall_ids") : body.get("stallIds"));
-                List<Integer> stallIds = rawList.stream()
-                        .map(id -> id instanceof Number n ? n.intValue() : Integer.parseInt(id.toString()))
+                List<?> rawList = (List<?>) stallIdsObj;
 
+                List<Integer> stallIds = rawList.stream()
+                        .map(id -> id instanceof Number n
+                                ? n.intValue()
+                                : Integer.parseInt(id.toString()))
                         .toList();
-                List<ReservationDto> dtos = reservationService.createReservations(principal.getId(), stallIds);
-                return ResponseEntity.status(HttpStatus.CREATED).body(dtos);
+
+
+                List<ReservationDto> dtos =
+                        reservationService.createReservations(
+                                principal.getId(),
+                                stallIds
+                        );
+
+                return ResponseEntity
+                        .status(HttpStatus.CREATED)
+                        .body(dtos);
             }
+
+
+            // Single stall reservation
             Object stallIdObj = body.get("stallId");
+
             if (stallIdObj == null) {
-                return ResponseEntity.badRequest().body(Map.of("message", "stallId or stallIds is required"));
+                return ResponseEntity
+                        .badRequest()
+                        .body(Map.of(
+                                "message",
+                                "stallId or stallIds is required"
+                        ));
             }
-            Integer stallId = stallIdObj instanceof Number n ? n.intValue() : Integer.parseInt(stallIdObj.toString());
-            ReservationDto dto = reservationService.createReservation(principal.getId(), stallId);
-            return ResponseEntity.status(HttpStatus.CREATED).body(dto);
+
+
+            Integer stallId = stallIdObj instanceof Number n
+                    ? n.intValue()
+                    : Integer.parseInt(stallIdObj.toString());
+
+
+            ReservationDto dto =
+                    reservationService.createReservation(
+                            principal.getId(),
+                            stallId
+                    );
+
+
+            return ResponseEntity
+                    .status(HttpStatus.CREATED)
+                    .body(dto);
+
+
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+
+            return ResponseEntity
+                    .badRequest()
+                    .body(Map.of(
+                            "message",
+                            e.getMessage()
+                    ));
         }
     }
 
-    @GetMapping("/my")
-    public ResponseEntity<List<ReservationDto>> getMyReservations(@AuthenticationPrincipal UserPrincipal principal) {
-        return ResponseEntity.ok(reservationService.getMyReservations(principal.getId()));
-    }
 
+
+    // "My reservations" endpoint
+    @GetMapping("/my")
+    public ResponseEntity<List<ReservationDto>> getMyReservations(
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        return ResponseEntity.ok(
+                reservationService.getMyReservations(principal.getId())
+        );
+    }
 }

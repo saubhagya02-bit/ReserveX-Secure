@@ -8,7 +8,6 @@ package com.reservex.backend.services;
 import com.reservex.backend.config.JwtUtil;
 import com.reservex.backend.config.UserPrincipal;
 import com.reservex.backend.dto.JwtResponse;
-import com.reservex.backend.dto.LoginResponse;
 import com.reservex.backend.dto.RegisterRequest;
 import com.reservex.backend.entity.User;
 import com.reservex.backend.repositories.UserRepository;
@@ -40,41 +39,23 @@ public class AuthService {
                 .username(request.getUsername())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .businessName(request.getBusinessName())
-
-//                .contactPerson(request.getContactPerson())
-//                .phone(request.getPhone())
-//                .address(request.getAddress())
-
                 .role(User.Role.VENDOR)
                 .build();
         return userRepository.save(user);
     }
 
-    public LoginResponse login(String emailOrUsername, String password) {
+    public JwtResponse login(String email, String password) {
         Authentication auth = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(emailOrUsername, password));
+                new UsernamePasswordAuthenticationToken(email, password));
         var principal = (UserPrincipal) auth.getPrincipal();
         String token = jwtUtil.generateToken(auth);
-        User user = userRepository.findById(principal.getId())
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
-        return LoginResponse.builder()
+        return JwtResponse.builder()
                 .token(token)
-
-                .user(LoginResponse.UserInfo.builder()
-                        .userId(user.getId())
-                        .username(user.getUsername())
-                        .businessName(user.getBusinessName())
-                        .email(user.getEmail())
-                        .roles(user.getRole().name())
-                        .noOfCurrentBookings(user.getNoOfCurrentBookings())
-                        .build())
-
                 .id(principal.getId())
                 .email(principal.getEmail())
                 .businessName(principal.getBusinessName())
                 .role(principal.getRole())
                 .noOfCurrentBookings(principal.getNoOfCurrentBookings())
-
                 .build();
     }
 }

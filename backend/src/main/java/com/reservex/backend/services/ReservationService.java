@@ -107,7 +107,7 @@ public class ReservationService {
         // Flush to ensure all data is persisted before sending email
         reservationRepository.flush();
         stallRepository.flush();
-        
+
         // Send email with reservation details
         emailService.sendReservationConfirmation(user, reservation);
 
@@ -120,11 +120,7 @@ public class ReservationService {
     public List<ReservationDto> getMyReservations(Integer userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
-
-        return reservationRepository.findByUserOrderByReservationDateDesc(user).stream()
-
         return reservationRepository.findByUserWithDetailsOrderByReservationDateDesc(user).stream()
-
                 .map(ReservationDto::fromEntity)
                 .collect(Collectors.toList());
     }
