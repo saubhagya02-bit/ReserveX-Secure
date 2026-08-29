@@ -1,7 +1,12 @@
 import { useState } from "react";
 import { registerUser } from "../services/auth.service";
 import { useNavigate, Link } from "react-router-dom";
-import { UserIcon, EnvelopeIcon, LockClosedIcon, BuildingStorefrontIcon } from "@heroicons/react/24/solid";
+import {
+  UserIcon,
+  EnvelopeIcon,
+  LockClosedIcon,
+  BuildingStorefrontIcon,
+} from "@heroicons/react/24/solid";
 import toast from "react-hot-toast";
 
 const RegisterPage = () => {
@@ -10,7 +15,7 @@ const RegisterPage = () => {
     username: "",
     email: "",
     password: "",
-    confirmPassword: ""
+    confirmPassword: "",
   });
 
   const [isLoading, setIsLoading] = useState(false);
@@ -27,7 +32,6 @@ const RegisterPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-
     if (formData.password !== formData.confirmPassword) {
       toast.error("Password doesnt match");
       return;
@@ -37,12 +41,10 @@ const RegisterPage = () => {
 
     try {
       const response = await registerUser(formData);
-      toast.success("Account created! Please login.")
+      toast.success("Account created! Please login.");
       navigate("/login");
-
     } catch (error) {
       toast.error(error);
-
     } finally {
       setIsLoading(false);
     }
@@ -50,18 +52,20 @@ const RegisterPage = () => {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 px-6">
-
       <div className="text-center mb-8 lg:mt-8">
         <h1 className="text-3xl font-bold">Join ReserveX</h1>
         <p className="text-gray-500 mt-2 max-w-md">
-          Join Sri Lanka’s largest literary event. Fill the form below to become a registered vendor.
+          Join Sri Lanka’s largest literary event. Fill the form below to become
+          a registered vendor.
         </p>
       </div>
 
       <div className="w-full max-w-md bg-white rounded-2xl shadow-lg">
-
         <div className="flex">
-          <button onClick={() => navigate("/login")} className="flex-1 py-3 text-sm font-medium text-gray-500 hover:text-blue-600 transition">
+          <button
+            onClick={() => navigate("/login")}
+            className="flex-1 py-3 text-sm font-medium text-gray-500 hover:text-blue-600 transition"
+          >
             Sign In
           </button>
           <button className="flex-1 py-3 text-sm font-medium border-b-2 border-blue-500 text-blue-600">
@@ -75,7 +79,6 @@ const RegisterPage = () => {
             Create your vendor account to start reserving stalls.
           </p>
           <form onSubmit={handleSubmit} className="space-y-5">
-
             <div className="relative">
               <label className="block text-sm mb-2">Buissnes Name</label>
               <div className="relative">
@@ -84,10 +87,7 @@ const RegisterPage = () => {
                 </span>
                 <input
                   type="text"
-                  name="BuissnesName"
-
                   name="business_name"
-
                   placeholder="Business Name (e.g. Sarasavi Publishers)"
                   onChange={handleChange}
                   required
@@ -173,9 +173,7 @@ const RegisterPage = () => {
             >
               {isLoading ? "Creating Account..." : "Sign Up"}
             </button>
-
           </form>
-
 
           <p className="text-center text-gray-500 mt-8">
             Already have an account?{" "}
@@ -183,11 +181,9 @@ const RegisterPage = () => {
               Login
             </Link>
           </p>
-
         </div>
       </div>
     </div>
-
   );
 };
 

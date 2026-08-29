@@ -1,9 +1,3 @@
-// Intercepts every request
-// Reads Authorization: Bearer <token>
-// Validates token using JwtUtil
-// If valid, sets authenticated user into SecurityContext
-
-
 package com.reservex.backend.config;
 
 import jakarta.servlet.FilterChain;
@@ -31,29 +25,41 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     private final UserDetailsService userDetailsService;
 
     @Override
-    protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
-        return request.getServletPath().startsWith("/api/auth/");
-    }
-
-    @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
-                                    FilterChain filterChain) throws ServletException, IOException {
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain filterChain)
+            throws ServletException, IOException {
         try {
             String token = getJwtFromRequest(request);
-            if (StringUtils.hasText(token)
-                    && jwtUtil.validateToken(token)
-                    && SecurityContextHolder.getContext().getAuthentication() == null) {
-                String email = jwtUtil.getEmailFromToken(token);
-                var userDetails = userDetailsService.loadUserByUsername(email);
-                var auth = new UsernamePasswordAuthenticationToken(
-                        userDetails, null, userDetails.getAuthorities());
-                auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                SecurityContextHolder.getContext().setAuthentication(auth);
-                log.debug("JWT token validated for user: {}", email);
+
+            if (!StringUtils.hasText(token)) {
+                filterChain.doFilter(request, response);
+                return;
             }
+
+            if (SecurityContextHolder.getContext().getAuthentication() == null) {
+                try {
+
+                    if (jwtUtil.validateToken(token)) {
+                        String email = jwtUtil.getEmailFromToken(token);
+                        var userDetails = userDetailsService.loadUserByUsername(email);
+                        var auth = new UsernamePasswordAuthenticationToken(
+                                userDetails, null, userDetails.getAuthorities());
+                        auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                        SecurityContextHolder.getContext().setAuthentication(auth);
+                        log.debug("Custom JWT validated for user: {}", email);
+                    }
+
+                } catch (Exception e) {
+
+                    log.debug("Not a custom JWT token, letting oauth2ResourceServer handle it");
+                }
+            }
+
         } catch (Exception e) {
-            log.debug("Could not set user authentication in security context", e);
+            log.debug("JwtAuthFilter error: {}", e.getMessage());
         }
+
         filterChain.doFilter(request, response);
     }
 
