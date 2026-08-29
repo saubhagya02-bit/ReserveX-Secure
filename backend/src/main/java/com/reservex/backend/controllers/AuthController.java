@@ -4,6 +4,7 @@
 
 package com.reservex.backend.controllers;
 
+import com.reservex.backend.config.AuditService;
 import com.reservex.backend.dto.JwtResponse;
 import com.reservex.backend.dto.LoginRequest;
 import com.reservex.backend.dto.RegisterRequest;
@@ -11,6 +12,7 @@ import com.reservex.backend.entity.User;
 import com.reservex.backend.services.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,7 +22,9 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class AuthController {
 
+    @Autowired
     private final AuthService authService;
+    private AuditService auditService;
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
@@ -45,4 +49,5 @@ public class AuthController {
 
     public record RegisterResponse(Integer id, String email, String businessName) {}
     public record ErrorMessage(String message) {}
+
 }
