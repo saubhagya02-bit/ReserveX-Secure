@@ -10,9 +10,8 @@ const NavBar = () => {
   const [isOpen, setIsOpen] = useState(false);
 
   const handleLogout = () => {
-    logout();
-    navigate("/");
     setIsOpen(false);
+    logout();
   };
 
   return (
@@ -20,13 +19,11 @@ const NavBar = () => {
       <div className="max-w-7xl mx-auto px-6">
         <div className="flex items-center justify-between h-16">
           <Link to="/" className="flex items-center gap-3">
-
             <img
               src={logo}
               alt="ReserveX Logo"
               className="h-11 w-auto object-contain"
             />
-
 
             <h1 className="text-white text-2xl font-bold tracking-wide">
               ReserveX
