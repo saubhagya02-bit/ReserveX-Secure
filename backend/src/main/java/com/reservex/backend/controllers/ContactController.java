@@ -2,6 +2,7 @@ package com.reservex.backend.controllers;
 
 import com.reservex.backend.dto.ContactRequest;
 import com.reservex.backend.services.EmailService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,7 +17,7 @@ public class ContactController {
     private final EmailService emailService;
 
     @PostMapping
-    public ResponseEntity<?> submitContactForm(@RequestBody ContactRequest request) {
+    public ResponseEntity<?> submitContactForm(@Valid @RequestBody ContactRequest request) {
 
         emailService.sendContactUsEmail(request);
 

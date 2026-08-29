@@ -146,15 +146,13 @@ public class StallService {
         Stall stall = stallRepository.findById(stallId)
                 .orElseThrow(() -> new IllegalArgumentException("Stall not found: " + stallId));
         String stallName = stall.getName();
-        
-        // Case 1: Stall is not reserved (is_Confirmed = false or null)
+
         if (stall.getIsConfirmed() == null || !stall.getIsConfirmed()) {
             // Simply delete the stall - no reservations to handle
             stallRepository.delete(stall);
             return;
         }
-        
-        // Cases 2 & 3: Stall is reserved (is_Confirmed = true)
+
         // Find all reservations that include this stall
         List<Reservation> reservationsWithStall = reservationRepository.findByStalls_Id(stallId);
         
@@ -181,8 +179,7 @@ public class StallService {
             int newBookingCount = Math.max(0, user.getNoOfCurrentBookings() - 1);
             user.setNoOfCurrentBookings(newBookingCount);
             userRepository.save(user);
-            
-            // Case 3: This was the only stall in the reservation
+
             if (stallCountBeforeDeletion == 1) {
                 // Delete the reservation (cascade will handle reservation_stalls)
                 reservationRepository.delete(reservation);
@@ -193,14 +190,13 @@ public class StallService {
                         user, 
                         stallName, 
                         newBookingCount, 
-                        true  // reservationCancelled = true
+                        true
                     );
                 } catch (Exception e) {
                     // Log but don't fail the transaction
                     System.err.println("Failed to send email: " + e.getMessage());
                 }
-            } 
-            // Case 2: User still has other stalls in the reservation
+            }
             else {
                 // Save the updated reservation
                 reservationRepository.save(reservation);
@@ -211,7 +207,7 @@ public class StallService {
                         user, 
                         stallName, 
                         newBookingCount, 
-                        false  // reservationCancelled = false
+                        false
                     );
                 } catch (Exception e) {
                     // Log but don't fail the transaction
@@ -275,7 +271,6 @@ public class StallService {
             userRepository.save(user);
             System.out.println(">>> Updated user booking count to: " + newBookingCount);
 
-            // Case 1: This was the only stall in the reservation
             if (stallCountBeforeDeletion == 1) {
                 System.out.println(">>> Case 1: Deleting reservation (only stall)");
                 // Delete the reservation (cascade will handle reservation_stalls)
@@ -295,7 +290,6 @@ public class StallService {
                     System.err.println("Failed to send email: " + e.getMessage());
                 }
             }
-            // Case 2: User still has other stalls in the reservation
             else {
                 System.out.println(">>> Case 2: Saving updated reservation (multiple stalls)");
                 // Save the updated reservation
@@ -307,7 +301,7 @@ public class StallService {
                         user,
                         stallName,
                         newBookingCount,
-                        false  // reservationCancelled = false
+                        false
                     );
                     System.out.println(">>> Email sent successfully");
                 } catch (Exception e) {
