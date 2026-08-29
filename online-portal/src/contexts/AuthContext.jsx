@@ -1,71 +1,130 @@
-import { createContext, useEffect, useState } from "react";
-import { getCurrentUser } from "../services/auth.service";
+import {
+  createContext,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
+import { useAuthContext } from "@asgardeo/auth-react";
 
 export const AuthContext = createContext();
 
+const BASE_URL = "https://localhost:8443/api";
+const SDK_TIMEOUT_MS = 4000;
+
 export const AuthProvider = ({ children }) => {
+  const { state, signIn, signOut, httpRequest } = useAuthContext();
 
+  const [backendUser, setBackendUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-    // {
-    //   "user_id": 101,                  
-    //   "username": "saman_pub"
-    //   "business_name": "Saman Publishers",
-    //   "email": "saman@example.com",
-    //   "roles": "vendor",
-    //   "no_of_current_bookings": 1      // Used for UI validation (Max 3)
-    // }
+  const [sdkStalled, setSdkStalled] = useState(false);
 
-    const [user, setUser] = useState(() => {          //This runs ONCE when the app loads prevent relaod
-        const savedUser = localStorage.getItem("user");
-        if (!savedUser) return null;
-        try {
-            return JSON.parse(savedUser);
-        } catch (error) {
-            localStorage.removeItem("user");
-            return null;
-        }
-    });
-    const [isAuthenticated, setIsAuthenticated] = useState(() => {
-        // If we have a token we are authenticated
-        return !!localStorage.getItem("token");
-    })
-    const [loading, setLoading] = useState(true);   //TODO: prevent Login Page Flash when refresh
+  const hasFetched = useRef(false);
+  const fetchInFlight = useRef(false);
 
-    const login = (userData, token) => {
-        localStorage.setItem("token", token);
-        localStorage.setItem("user", JSON.stringify(userData));
-        setIsAuthenticated(true);
-        setUser(userData)
-    };
+  useEffect(() => {
+    if (!state.isLoading) return;
+    const timer = setTimeout(() => {
+      console.warn(
+        "[auth] SDK isLoading did not resolve after",
+        SDK_TIMEOUT_MS,
+        "ms — proceeding without waiting on it further.",
+      );
+      setSdkStalled(true);
+    }, SDK_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [state.isLoading]);
 
-    const logout = () => {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-        setIsAuthenticated(false);
-        setUser(null)
-    };
+  const fetchBackendUser = useCallback(async () => {
+    if (fetchInFlight.current) return;
+    fetchInFlight.current = true;
+    try {
+      setLoading(true);
+      const response = await httpRequest({
+        url: `${BASE_URL}/users/me`,
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
+      setBackendUser(response.data);
+      hasFetched.current = true;
+    } catch (err) {
+      console.error("fetchBackendUser error:", err?.response?.status);
+      setBackendUser(null);
+      hasFetched.current = true;
+    } finally {
+      setLoading(false);
+      fetchInFlight.current = false;
+    }
+  }, [httpRequest]);
 
-    const refreshUser = async () => {
-        try {
-            const userData = await getCurrentUser();
-            // Ensure noOfCurrentBookings has a default value
-            const updatedUser = {
-                ...userData,
-                noOfCurrentBookings: userData.noOfCurrentBookings ?? 0
-            };
-            localStorage.setItem("user", JSON.stringify(updatedUser));
-            setUser(updatedUser);
-            return updatedUser;
-        } catch (error) {
-            console.error("Failed to refresh user data:", error);
-            // If refresh fails, keep existing user data
-            return user;
-        }
-    };
+  useEffect(() => {
+    if (state.isAuthenticated && !hasFetched.current) {
+      fetchBackendUser();
+    } else if (!state.isAuthenticated) {
+      setBackendUser(null);
+      hasFetched.current = false;
+      setLoading(false);
+    }
+  }, [state.isAuthenticated, fetchBackendUser]);
 
-    return (
-        <AuthContext.Provider value={{ isAuthenticated, user, login, logout, refreshUser }}>
-            {children}
-        </AuthContext.Provider>
-    );
+  const login = () => signIn();
+  const logout = () => {
+    hasFetched.current = false;
+    signOut();
+  };
+
+  const refreshUser = async () => {
+    hasFetched.current = false;
+    await fetchBackendUser();
+  };
+
+  const user = useMemo(
+    () =>
+      state.isAuthenticated
+        ? {
+            username: state.username || "",
+            email: state.email || "",
+            displayName: state.displayName || state.username || "",
+            noOfCurrentBookings: backendUser?.noOfCurrentBookings ?? 0,
+            businessName:
+              backendUser?.businessName ||
+              state.displayName ||
+              state.username ||
+              "",
+          }
+        : null,
+    [
+      state.isAuthenticated,
+      state.username,
+      state.email,
+      state.displayName,
+      backendUser,
+    ],
+  );
+
+  const contextValue = useMemo(
+    () => ({
+      isAuthenticated: state.isAuthenticated,
+      isLoading: (state.isLoading && !sdkStalled) || loading,
+      user,
+      login,
+      logout,
+      httpRequest,
+      refreshUser,
+    }),
+    [
+      state.isAuthenticated,
+      state.isLoading,
+      sdkStalled,
+      loading,
+      user,
+      httpRequest,
+    ],
+  );
+
+  return (
+    <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
+  );
 };
