@@ -12,7 +12,12 @@ import {
 } from "../services/viewReservationsFilters";
 import "./ViewReservations.css";
 
+import { useContext } from "react";
+import { AuthContext } from "../contexts/AuthContext";
+
 export default function ViewReservations() {
+  const { httpRequest } = useContext(AuthContext);
+
   const [reservations, setReservations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -31,23 +36,28 @@ export default function ViewReservations() {
   const [toDraft, setToDraft] = useState("");
 
   useEffect(() => {
-    api
-      .get("/admin/reservations")
+    if (!httpRequest) return;
+
+    httpRequest({
+      url: "https://localhost:8443/api/admin/reservations",
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    })
       .then((res) => {
         setReservations(res.data || []);
         setError(null);
       })
       .catch((err) => {
         console.error("Error fetching reservations:", err);
-        setError(err?.response?.data?.message || "Failed to load reservations.");
+        setError("Failed to load reservations.");
         setReservations([]);
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [httpRequest]);
 
   const statusOptions = useMemo(
     () => buildStatusOptionsFromReservations(reservations),
-    [reservations]
+    [reservations],
   );
 
   const displayedReservations = useMemo(
@@ -60,7 +70,7 @@ export default function ViewReservations() {
         toDate,
         idOrder: "desc",
       }),
-    [reservations, businessQuery, stallQuery, statusFilter, fromDate, toDate]
+    [reservations, businessQuery, stallQuery, statusFilter, fromDate, toDate],
   );
 
   const applyFilter = () => {
@@ -154,7 +164,11 @@ export default function ViewReservations() {
           Filter
         </button>
         {activeFilter && (
-          <button type="button" className="clear-filter-btn" onClick={clearFilter}>
+          <button
+            type="button"
+            className="clear-filter-btn"
+            onClick={clearFilter}
+          >
             Clear
           </button>
         )}
@@ -210,4 +224,3 @@ export default function ViewReservations() {
     </div>
   );
 }
-
