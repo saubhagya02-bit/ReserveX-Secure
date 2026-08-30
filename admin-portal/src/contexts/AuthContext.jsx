@@ -20,11 +20,13 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [sdkStalled, setSdkStalled] = useState(false);
 
+  // Used when a vendor tries to enter the Admin Portal
+  const [accessDenied, setAccessDenied] = useState(false);
+
   const hasFetched = useRef(false);
   const fetchInFlight = useRef(false);
 
   // ASGARDEO SDK TIMEOUT
-
   useEffect(() => {
     if (!state.isLoading) {
       setSdkStalled(false);
@@ -46,7 +48,6 @@ export const AuthProvider = ({ children }) => {
 
   // FETCH BACKEND USER
   // ADMIN PORTAL = ORGANIZER ONLY
-
   const fetchBackendUser = useCallback(async () => {
     if (fetchInFlight.current) {
       return;
@@ -56,6 +57,7 @@ export const AuthProvider = ({ children }) => {
 
     try {
       setLoading(true);
+      setAccessDenied(false);
 
       const response = await httpRequest({
         url: `${BASE_URL}/users/me`,
@@ -69,33 +71,36 @@ export const AuthProvider = ({ children }) => {
 
       console.log("[admin-auth] Backend user:", userData);
 
-      // ========================================================
-      // ADMIN PORTAL IS ONLY FOR ORGANIZERS
-      // ========================================================
-
+      // ADMIN PORTAL ROLE CHECK
+      // ONLY EMPLOYEE / ORGANIZER IS ALLOWED
+      // VENDOR / NON-ORGANIZER DETECTED
       if (userData?.role !== "EMPLOYEE") {
         console.warn(
           "[admin-auth] Non-organizer attempted to access Admin Portal:",
           userData?.role,
         );
 
+        sessionStorage.setItem(
+          "portalAccessError",
+          "Your account does not have permission to access the Admin Portal. Please sign in with an Organizer account.",
+        );
+
+        sessionStorage.setItem("portalAccessType", "organizer-only");
+
         setBackendUser(null);
         hasFetched.current = false;
 
-        alert(
-          "Access Denied: This portal is for Organizers only. Please use the Online Portal.",
-        );
-
+        // Asgardeo handles the redirect
         await signOut();
 
         return;
       }
 
-      // ========================================================
       // VALID ORGANIZER
-      // ========================================================
+      console.log("[admin-auth] Organizer authenticated successfully.");
 
       setBackendUser(userData);
+      setAccessDenied(false);
       hasFetched.current = true;
     } catch (err) {
       console.error(
@@ -113,44 +118,54 @@ export const AuthProvider = ({ children }) => {
   }, [httpRequest, signOut]);
 
   // AUTHENTICATION STATE
-
   useEffect(() => {
+    if (state.isLoading) {
+      return;
+    }
+
     if (state.isAuthenticated && !hasFetched.current) {
       fetchBackendUser();
-    } else if (!state.isAuthenticated) {
+      return;
+    }
+
+    if (!state.isAuthenticated) {
       setBackendUser(null);
       hasFetched.current = false;
+      fetchInFlight.current = false;
       setLoading(false);
     }
-  }, [state.isAuthenticated, fetchBackendUser]);
+  }, [state.isAuthenticated, state.isLoading, fetchBackendUser]);
 
   // LOGIN
-
   const login = useCallback(() => {
+    setAccessDenied(false);
     signIn();
   }, [signIn]);
 
   // LOGOUT
-
   const logout = useCallback(async () => {
     hasFetched.current = false;
     fetchInFlight.current = false;
 
     setBackendUser(null);
+    setAccessDenied(false);
 
-    await signOut();
+    try {
+      await signOut();
+    } catch (error) {
+      console.error("[admin-auth] Logout error:", error);
+    }
   }, [signOut]);
 
   // REFRESH USER
-
   const refreshUser = useCallback(async () => {
     hasFetched.current = false;
+    setAccessDenied(false);
 
     await fetchBackendUser();
   }, [fetchBackendUser]);
 
   // API REQUEST HELPER
-
   const apiRequest = useCallback(
     async (path, method = "GET", data = null) => {
       const config = {
@@ -173,30 +188,27 @@ export const AuthProvider = ({ children }) => {
   );
 
   // USER OBJECT
-
   const user = useMemo(() => {
-    if (!state.isAuthenticated) {
+    if (!state.isAuthenticated || !backendUser) {
       return null;
     }
 
     return {
       username: state.username || "",
-
       email: state.email || "",
 
       displayName: state.displayName || state.username || "",
 
       sub: state.username || "",
 
-      // Backend user information
-      id: backendUser?.id,
+      id: backendUser.id,
 
-      role: backendUser?.role || null,
+      role: backendUser.role,
 
       businessName:
-        backendUser?.businessName || state.displayName || state.username || "",
+        backendUser.businessName || state.displayName || state.username || "",
 
-      noOfCurrentBookings: backendUser?.noOfCurrentBookings ?? 0,
+      noOfCurrentBookings: backendUser.noOfCurrentBookings ?? 0,
     };
   }, [
     state.isAuthenticated,
@@ -207,7 +219,6 @@ export const AuthProvider = ({ children }) => {
   ]);
 
   // CONTEXT VALUE
-
   const contextValue = useMemo(
     () => ({
       isAuthenticated: state.isAuthenticated,
@@ -216,11 +227,12 @@ export const AuthProvider = ({ children }) => {
 
       user,
 
+      accessDenied,
+
       login,
       logout,
 
       httpRequest,
-
       apiRequest,
 
       refreshUser,
@@ -231,6 +243,7 @@ export const AuthProvider = ({ children }) => {
       sdkStalled,
       loading,
       user,
+      accessDenied,
       login,
       logout,
       httpRequest,
@@ -238,8 +251,6 @@ export const AuthProvider = ({ children }) => {
       refreshUser,
     ],
   );
-
-  // PROVIDER
 
   return (
     <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
