@@ -20,11 +20,14 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [sdkStalled, setSdkStalled] = useState(false);
 
+  // IMPORTANT
+  const [roleChecked, setRoleChecked] = useState(false);
+  const [accessDenied, setAccessDenied] = useState(false);
+
   const hasFetched = useRef(false);
   const fetchInFlight = useRef(false);
 
   // ASGARDEO SDK TIMEOUT
-
   useEffect(() => {
     if (!state.isLoading) {
       setSdkStalled(false);
@@ -32,11 +35,7 @@ export const AuthProvider = ({ children }) => {
     }
 
     const timer = setTimeout(() => {
-      console.warn(
-        "[auth] Asgardeo SDK isLoading did not resolve after",
-        SDK_TIMEOUT_MS,
-        "ms.",
-      );
+      console.warn("[online-auth] Asgardeo SDK loading timeout");
 
       setSdkStalled(true);
     }, SDK_TIMEOUT_MS);
@@ -46,7 +45,6 @@ export const AuthProvider = ({ children }) => {
 
   // FETCH BACKEND USER
   // ONLINE PORTAL = VENDOR ONLY
-
   const fetchBackendUser = useCallback(async () => {
     if (fetchInFlight.current) {
       return;
@@ -56,6 +54,8 @@ export const AuthProvider = ({ children }) => {
 
     try {
       setLoading(true);
+      setRoleChecked(false);
+      setAccessDenied(false);
 
       const response = await httpRequest({
         url: `${BASE_URL}/users/me`,
@@ -67,90 +67,96 @@ export const AuthProvider = ({ children }) => {
 
       const userData = response.data;
 
-      console.log("[auth] Backend user:", userData);
+      console.log("[online-auth] Backend user:", userData);
 
-      // ========================================================
-      // IMPORTANT:
-      // ONLINE PORTAL IS ONLY FOR VENDORS
-      // ========================================================
-
+      // ROLE CHECK
       if (userData?.role !== "VENDOR") {
-        console.warn(
-          "[auth] Non-vendor attempted to access Online Portal:",
-          userData?.role,
-        );
+        console.warn("[online-auth] Access denied. User role:", userData?.role);
 
-        setBackendUser(null);
-        hasFetched.current = false;
+        setBackendUser(userData);
+        setAccessDenied(true);
 
-        alert(
-          "Access Denied: This portal is for Vendors only. Please use the Admin Portal.",
-        );
-
-        await signOut();
+        setRoleChecked(true);
 
         return;
       }
 
-      // ========================================================
       // VALID VENDOR
-      // ========================================================
+      console.log("[online-auth] Vendor access granted");
 
       setBackendUser(userData);
+      setAccessDenied(false);
+      setRoleChecked(true);
       hasFetched.current = true;
     } catch (err) {
       console.error(
-        "[auth] fetchBackendUser error:",
+        "[online-auth] fetchBackendUser error:",
         err?.response?.status,
         err?.response?.data || err,
       );
 
       setBackendUser(null);
-      hasFetched.current = true;
+      setAccessDenied(true);
+      setRoleChecked(true);
     } finally {
       setLoading(false);
       fetchInFlight.current = false;
     }
-  }, [httpRequest, signOut]);
+  }, [httpRequest]);
 
-  // AUTHENTICATION STATE
-
+  // AUTH STATE
   useEffect(() => {
-    if (state.isAuthenticated && !hasFetched.current) {
-      fetchBackendUser();
-    } else if (!state.isAuthenticated) {
-      setBackendUser(null);
-      hasFetched.current = false;
-      setLoading(false);
+    if (state.isLoading) {
+      return;
     }
-  }, [state.isAuthenticated, fetchBackendUser]);
+
+    // User logged in
+    if (state.isAuthenticated) {
+      if (!hasFetched.current) {
+        fetchBackendUser();
+      }
+
+      return;
+    }
+
+    // User logged out
+    setBackendUser(null);
+    setAccessDenied(false);
+    setRoleChecked(false);
+    hasFetched.current = false;
+    setLoading(false);
+  }, [state.isAuthenticated, state.isLoading, fetchBackendUser]);
 
   // LOGIN
-
   const login = useCallback(() => {
+    setAccessDenied(false);
+    setRoleChecked(false);
+    setBackendUser(null);
+    hasFetched.current = false;
+
     signIn();
   }, [signIn]);
 
   // LOGOUT
-
   const logout = useCallback(async () => {
     hasFetched.current = false;
     fetchInFlight.current = false;
+
     setBackendUser(null);
+    setAccessDenied(false);
+    setRoleChecked(false);
 
     await signOut();
   }, [signOut]);
 
   // REFRESH USER
-
   const refreshUser = useCallback(async () => {
     hasFetched.current = false;
 
     await fetchBackendUser();
   }, [fetchBackendUser]);
 
-  // API REQUEST HELPER
-
+  // API REQUEST
   const apiRequest = useCallback(
     async (path, method = "GET", data = null) => {
       const config = {
@@ -173,7 +179,6 @@ export const AuthProvider = ({ children }) => {
   );
 
   // USER OBJECT
-
   const user = useMemo(() => {
     if (!state.isAuthenticated) {
       return null;
@@ -187,7 +192,6 @@ export const AuthProvider = ({ children }) => {
 
       sub: state.username || "",
 
-      // Backend information
       id: backendUser?.id,
 
       role: backendUser?.role || null,
@@ -205,8 +209,7 @@ export const AuthProvider = ({ children }) => {
     backendUser,
   ]);
 
-  // CONTEXT VALUE
-
+  // CONTEXT
   const contextValue = useMemo(
     () => ({
       isAuthenticated: state.isAuthenticated,
@@ -214,6 +217,9 @@ export const AuthProvider = ({ children }) => {
       isLoading: (state.isLoading && !sdkStalled) || loading,
 
       user,
+
+      accessDenied,
+      roleChecked,
 
       login,
       logout,
@@ -229,6 +235,8 @@ export const AuthProvider = ({ children }) => {
       sdkStalled,
       loading,
       user,
+      accessDenied,
+      roleChecked,
       login,
       logout,
       httpRequest,
@@ -236,8 +244,6 @@ export const AuthProvider = ({ children }) => {
       refreshUser,
     ],
   );
-
-  // PROVIDER
 
   return (
     <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
