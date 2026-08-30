@@ -1,19 +1,15 @@
-// Reserve stall(s) endpoint
-// "My reservations" endpoint
-// Supports BOTH Asgardeo OIDC tokens (vendor portal) and custom JWT (admin portal)
-
 package com.reservex.backend.controllers;
 
 import com.reservex.backend.config.UserPrincipal;
 import com.reservex.backend.dto.ReservationDto;
 import com.reservex.backend.entity.User;
 import com.reservex.backend.repositories.UserRepository;
-import com.reservex.backend.services.ReservationGenreService;
 import com.reservex.backend.services.ReservationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
@@ -28,133 +24,397 @@ import java.util.Map;
 public class ReservationController {
 
     private final ReservationService reservationService;
-    private final ReservationGenreService genreService;
     private final UserRepository userRepository;
 
-    // -------------------------------------------------------
-    // POST /api/reservations — Create reservation
-    // -------------------------------------------------------
+    // CREATE RESERVATION
+    // ONLY VENDORS
+
+    @PreAuthorize("hasRole('Vendor')")
     @PostMapping
     public ResponseEntity<?> createReservation(
             Authentication authentication,
             @RequestBody Map<String, Object> body) {
+
         try {
-            // Get user from either Asgardeo token or custom JWT
+
             User user = getUserFromAuthentication(authentication);
 
             if (user == null) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(Map.of("message", "User not authenticated"));
+                return ResponseEntity
+                        .status(HttpStatus.UNAUTHORIZED)
+                        .body(
+                                Map.of(
+                                        "message",
+                                        "User not authenticated"
+                                )
+                        );
             }
 
-            // Handle list of stall IDs
-            if (body.get("stallIds") != null || body.get("stall_ids") != null) {
-                @SuppressWarnings("unchecked")
-                List<?> rawList = (List<?>) (body.get("stall_ids") != null
-                        ? body.get("stall_ids")
-                        : body.get("stallIds"));
+            // Extra database-level protection
+            if (user.getRole() != User.Role.VENDOR) {
 
-                List<Integer> stallIds = rawList.stream()
-                        .map(id -> id instanceof Number n
-                                ? n.intValue()
-                                : Integer.parseInt(id.toString()))
-                        .toList();
+                log.warn(
+                        "Non-vendor user {} attempted to create reservation. Role: {}",
+                        user.getUsername(),
+                        user.getRole()
+                );
 
-                log.info("Creating reservations for user: {} stallIds: {}",
-                        user.getUsername(), stallIds);
-
-                List<ReservationDto> dtos = reservationService
-                        .createReservations(user.getId(), stallIds);
-
-                return ResponseEntity.status(HttpStatus.CREATED).body(dtos);
+                return ResponseEntity
+                        .status(HttpStatus.FORBIDDEN)
+                        .body(
+                                Map.of(
+                                        "message",
+                                        "Only vendors can create reservations"
+                                )
+                        );
             }
 
-            // Handle single stall ID
-            Object stallIdObj = body.get("stallId");
-            if (stallIdObj == null) {
-                return ResponseEntity.badRequest()
-                        .body(Map.of("message", "stallId or stallIds is required"));
+
+            if (body.get("stallIds") != null
+                    || body.get("stall_ids") != null) {
+
+                Object stallIdsObject =
+                        body.get("stall_ids") != null
+                                ? body.get("stall_ids")
+                                : body.get("stallIds");
+
+                if (!(stallIdsObject instanceof List<?> rawList)) {
+
+                    return ResponseEntity
+                            .badRequest()
+                            .body(
+                                    Map.of(
+                                            "message",
+                                            "stallIds must be a list"
+                                    )
+                            );
+                }
+
+                List<Integer> stallIds;
+
+                try {
+
+                    stallIds = rawList.stream()
+                            .map(id ->
+                                    id instanceof Number number
+                                            ? number.intValue()
+                                            : Integer.parseInt(
+                                            id.toString()
+                                    )
+                            )
+                            .toList();
+
+                } catch (NumberFormatException e) {
+
+                    return ResponseEntity
+                            .badRequest()
+                            .body(
+                                    Map.of(
+                                            "message",
+                                            "Invalid stall ID"
+                                    )
+                            );
+                }
+
+                if (stallIds.isEmpty()) {
+
+                    return ResponseEntity
+                            .badRequest()
+                            .body(
+                                    Map.of(
+                                            "message",
+                                            "At least one stall ID is required"
+                                    )
+                            );
+                }
+
+                log.info(
+                        "Vendor {} creating reservations for stalls: {}",
+                        user.getUsername(),
+                        stallIds
+                );
+
+                List<ReservationDto> dtos =
+                        reservationService.createReservations(
+                                user.getId(),
+                                stallIds
+                        );
+
+                return ResponseEntity
+                        .status(HttpStatus.CREATED)
+                        .body(dtos);
             }
 
-            Integer stallId = stallIdObj instanceof Number n
-                    ? n.intValue()
-                    : Integer.parseInt(stallIdObj.toString());
+            // SINGLE STALL
 
-            log.info("Creating reservation for user: {} stallId: {}",
-                    user.getUsername(), stallId);
+            Object stallIdObject = body.get("stallId");
 
-            ReservationDto dto = reservationService
-                    .createReservation(user.getId(), stallId);
+            if (stallIdObject == null) {
 
-            return ResponseEntity.status(HttpStatus.CREATED).body(dto);
+                return ResponseEntity
+                        .badRequest()
+                        .body(
+                                Map.of(
+                                        "message",
+                                        "stallId or stallIds is required"
+                                )
+                        );
+            }
+
+            Integer stallId;
+
+            try {
+
+                stallId =
+                        stallIdObject instanceof Number number
+                                ? number.intValue()
+                                : Integer.parseInt(
+                                stallIdObject.toString()
+                        );
+
+            } catch (NumberFormatException e) {
+
+                return ResponseEntity
+                        .badRequest()
+                        .body(
+                                Map.of(
+                                        "message",
+                                        "Invalid stall ID"
+                                )
+                        );
+            }
+
+            log.info(
+                    "Vendor {} creating reservation for stall: {}",
+                    user.getUsername(),
+                    stallId
+            );
+
+            ReservationDto dto =
+                    reservationService.createReservation(
+                            user.getId(),
+                            stallId
+                    );
+
+            return ResponseEntity
+                    .status(HttpStatus.CREATED)
+                    .body(dto);
 
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("message", e.getMessage()));
+
+            log.warn(
+                    "Invalid reservation request: {}",
+                    e.getMessage()
+            );
+
+            return ResponseEntity
+                    .badRequest()
+                    .body(
+                            Map.of(
+                                    "message",
+                                    e.getMessage()
+                            )
+                    );
+
         } catch (Exception e) {
-            log.error("Error creating reservation: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("message", "An unexpected error occurred"));
+
+            log.error(
+                    "Error creating reservation",
+                    e
+            );
+
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(
+                            Map.of(
+                                    "message",
+                                    "An unexpected error occurred"
+                            )
+                    );
         }
     }
 
-    // -------------------------------------------------------
-    // GET /api/reservations/my — Get current user's reservations
-    // -------------------------------------------------------
+    // GET MY RESERVATIONS
+    // ONLY VENDORS
+
+    @PreAuthorize("hasRole('Vendor')")
     @GetMapping("/my")
-    public ResponseEntity<?> getMyReservations(Authentication authentication) {
+    public ResponseEntity<?> getMyReservations(
+            Authentication authentication) {
+
         try {
+
             User user = getUserFromAuthentication(authentication);
 
             if (user == null) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(Map.of("message", "User not authenticated"));
+
+                return ResponseEntity
+                        .status(HttpStatus.UNAUTHORIZED)
+                        .body(
+                                Map.of(
+                                        "message",
+                                        "User not authenticated"
+                                )
+                        );
             }
 
-            log.debug("Fetching reservations for user: {}", user.getUsername());
+            // Extra database-level protection
+            if (user.getRole() != User.Role.VENDOR) {
 
-            List<ReservationDto> reservations = reservationService
-                    .getMyReservations(user.getId());
+                log.warn(
+                        "Non-vendor user {} attempted to access reservations. Role: {}",
+                        user.getUsername(),
+                        user.getRole()
+                );
+
+                return ResponseEntity
+                        .status(HttpStatus.FORBIDDEN)
+                        .body(
+                                Map.of(
+                                        "message",
+                                        "Only vendors can access their reservations"
+                                )
+                        );
+            }
+
+            log.debug(
+                    "Fetching reservations for vendor: {}",
+                    user.getUsername()
+            );
+
+            List<ReservationDto> reservations =
+                    reservationService.getMyReservations(
+                            user.getId()
+                    );
 
             return ResponseEntity.ok(reservations);
 
         } catch (Exception e) {
-            log.error("Error fetching reservations: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("message", "Failed to fetch reservations"));
+
+            log.error(
+                    "Error fetching reservations",
+                    e
+            );
+
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(
+                            Map.of(
+                                    "message",
+                                    "Failed to fetch reservations"
+                            )
+                    );
         }
     }
 
-    // -------------------------------------------------------
-    // Helper — Get User from either Asgardeo or custom JWT
-    // -------------------------------------------------------
-    private User getUserFromAuthentication(Authentication authentication) {
-        if (authentication == null) return null;
+    // GET USER FROM AUTHENTICATION
 
-        // ASGARDEO TOKEN (vendor portal)
+    private User getUserFromAuthentication(
+            Authentication authentication) {
+
+        if (authentication == null) {
+            return null;
+        }
+
+        // ASGARDEO JWT
+        // Vendor / Organizer
+
         if (authentication.getPrincipal() instanceof Jwt jwt) {
+
             String username = jwt.getSubject();
             String email = jwt.getClaimAsString("email");
             String displayName = jwt.getClaimAsString("name");
 
-            // Find existing user or create new one on first login
-            return userRepository.findByUsername(username)
+            List<String> roles =
+                    jwt.getClaimAsStringList("roles");
+
+            log.debug(
+                    "Asgardeo user: {} roles: {}",
+                    username,
+                    roles
+            );
+
+            // ----------------------------------------------------
+            // Determine role from Asgardeo
+            // ----------------------------------------------------
+
+            boolean isOrganizer =
+                    roles != null &&
+                            (
+                                    roles.contains("Organizer")
+                                            || roles.contains("EMPLOYEE")
+                            );
+
+            boolean isVendor =
+                    roles != null &&
+                            (
+                                    roles.contains("Vendor")
+                                            || roles.contains("VENDOR")
+                            );
+            // Reject user without valid role
+            if (!isOrganizer && !isVendor) {
+
+                log.warn(
+                        "User {} has no valid role. Roles: {}",
+                        username,
+                        roles
+                );
+
+                return null;
+            }
+
+            // Find existing user
+
+            return userRepository
+                    .findByUsername(username)
                     .orElseGet(() -> {
-                        log.info("Auto-creating user from Asgardeo token: {}", username);
-                        User newUser = User.builder()
-                                .username(username)
-                                .email(email != null ? email : username + "@asgardeo.user")
-                                .businessName(displayName != null ? displayName : username)
-                                .password("OIDC_USER") // no password — Asgardeo handles auth
-                                .role(User.Role.VENDOR)
-                                .build();
+
+                        User.Role role =
+                                isOrganizer
+                                        ? User.Role.EMPLOYEE
+                                        : User.Role.VENDOR;
+
+                        log.info(
+                                "Creating Asgardeo user {} with role {}",
+                                username,
+                                role
+                        );
+
+                        User newUser =
+                                User.builder()
+                                        .username(username)
+                                        .email(
+                                                email != null
+                                                        ? email
+                                                        : username
+                                                        + "@asgardeo.user"
+                                        )
+                                        .businessName(
+                                                displayName != null
+                                                        ? displayName
+                                                        : username
+                                        )
+                                        .password("OIDC_USER")
+                                        .role(role)
+                                        .build();
+
                         return userRepository.save(newUser);
                     });
         }
 
-        // CUSTOM JWT (admin portal)
-        if (authentication.getPrincipal() instanceof UserPrincipal principal) {
-            return userRepository.findById(principal.getId())
+        // CUSTOM JWT
+        // Admin portal
+
+        if (authentication.getPrincipal()
+                instanceof UserPrincipal principal) {
+
+            log.debug(
+                    "Custom JWT user: {}",
+                    principal.getEmail()
+            );
+
+            return userRepository
+                    .findById(principal.getId())
                     .orElse(null);
         }
 
