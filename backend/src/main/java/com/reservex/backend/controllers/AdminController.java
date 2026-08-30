@@ -1,9 +1,4 @@
-
 package com.reservex.backend.controllers;
-
-
-// Admin endpoints to view all stalls and reservations
-
 
 import com.reservex.backend.dto.ReservationDto;
 import com.reservex.backend.dto.StallDto;
@@ -19,20 +14,23 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/admin")
 @RequiredArgsConstructor
+@PreAuthorize("hasRole('Organizer')")
 public class AdminController {
 
     private final StallService stallService;
     private final ReservationService reservationService;
 
-    @PreAuthorize("hasRole('EMPLOYEE')") // Only allow users with EMPLOYEE role (admin) to access these endpoints
     @GetMapping("/stalls")
     public ResponseEntity<List<StallDto>> getAllStalls() {
-        return ResponseEntity.ok(stallService.getAllStallsWithAvailability());
+        return ResponseEntity.ok(
+                stallService.getAllStallsWithAvailability()
+        );
     }
 
-    @PreAuthorize("hasRole('EMPLOYEE')") // Only allow users with EMPLOYEE role (admin) to access these endpoints
     @GetMapping("/reservations")
     public ResponseEntity<List<ReservationDto>> getAllReservations() {
-        return ResponseEntity.ok(reservationService.getAllReservations());
+        return ResponseEntity.ok(
+                reservationService.getAllReservations()
+        );
     }
 }

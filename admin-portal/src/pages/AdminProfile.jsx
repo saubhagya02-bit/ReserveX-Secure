@@ -2,11 +2,10 @@ import React, { useContext, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./AdminProfile.css";
 import "../components/NavBar.css";
-import api from "../services/api";
 import { AuthContext } from "../contexts/AuthContext";
 
 export default function AdminProfile() {
-  const { user, logout } = useContext(AuthContext);
+  const { user, logout, httpRequest } = useContext(AuthContext);
   const navigate = useNavigate();
 
   const [profile, setProfile] = useState(null);
@@ -16,22 +15,40 @@ export default function AdminProfile() {
     newPassword: "",
     confirmPassword: "",
   });
+
   const [submitting, setSubmitting] = useState(false);
-  const [message, setMessage] = useState(null); // { type: 'success'|'error', text: string }
+  const [message, setMessage] = useState(null);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   const clearMessageSoon = () => {
     window.setTimeout(() => setMessage(null), 3500);
   };
 
+  // LOAD PROFILE
+
   const loadProfile = async () => {
     setLoadingProfile(true);
+
     try {
-      const res = await api.get("/users/me");
+      const res = await httpRequest({
+        url: "https://localhost:8443/api/users/me",
+        method: "GET",
+      });
+
       setProfile(res.data);
     } catch (err) {
+      console.error("Load profile error:", err);
+
       setProfile(null);
-      setMessage({ type: "error", text: err?.response?.data?.message || "Failed to load profile." });
+
+      setMessage({
+        type: "error",
+        text:
+          err?.response?.data?.message ||
+          err?.message ||
+          "Failed to load profile.",
+      });
+
       clearMessageSoon();
     } finally {
       setLoadingProfile(false);
@@ -40,23 +57,33 @@ export default function AdminProfile() {
 
   useEffect(() => {
     loadProfile();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // FORM CHANGE
 
   const onChange = (e) => {
     const { name, value } = e.target;
-    setForm((p) => ({ ...p, [name]: value }));
+
+    setForm((p) => ({
+      ...p,
+      [name]: value,
+    }));
   };
+
+  // PASSWORD VALIDATION
 
   const passwordChecks = useMemo(() => {
     const pwd = form.newPassword || "";
+
     return {
       minLength: pwd.length >= 8,
       hasLower: /[a-z]/.test(pwd),
       hasNumber: /\d/.test(pwd),
       hasSpecial: /[^A-Za-z\d]/.test(pwd),
       matchesConfirm:
-        form.confirmPassword.length > 0 && pwd.length > 0 && pwd === form.confirmPassword,
+        form.confirmPassword.length > 0 &&
+        pwd.length > 0 &&
+        pwd === form.confirmPassword,
     };
   }, [form.confirmPassword, form.newPassword]);
 
@@ -72,19 +99,33 @@ export default function AdminProfile() {
     return !submitting && checksOk;
   }, [form.confirmPassword, form.newPassword, passwordChecks, submitting]);
 
+  // DATE FORMAT
+
   const formatDateTime = (iso) => {
     if (!iso) return "—";
+
     const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return "—";
+
+    if (Number.isNaN(d.getTime())) {
+      return "—";
+    }
+
     return d.toLocaleString();
   };
 
+  // CHANGE PASSWORD
+
   const handleChangePassword = async (e) => {
     e.preventDefault();
+
     setMessage(null);
 
     if (form.newPassword !== form.confirmPassword) {
-      setMessage({ type: "error", text: "New password and confirmation do not match." });
+      setMessage({
+        type: "error",
+        text: "New password and confirmation do not match.",
+      });
+
       clearMessageSoon();
       return;
     }
@@ -100,22 +141,50 @@ export default function AdminProfile() {
         type: "error",
         text: "Password must be at least 8 characters and include lowercase, number, and special character.",
       });
+
       clearMessageSoon();
       return;
     }
 
     setSubmitting(true);
+
     try {
-      await api.post("/users/me/password", {
-        newPassword: form.newPassword,
-        confirmPassword: form.confirmPassword,
+      await httpRequest({
+        url: "https://localhost:8443/api/users/me/password",
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        data: {
+          newPassword: form.newPassword,
+          confirmPassword: form.confirmPassword,
+        },
       });
-      setMessage({ type: "success", text: "Password changed successfully." });
-      setForm({ newPassword: "", confirmPassword: "" });
-      await loadProfile(); // refresh lastUpdatedAt
+
+      setMessage({
+        type: "success",
+        text: "Password changed successfully.",
+      });
+
+      setForm({
+        newPassword: "",
+        confirmPassword: "",
+      });
+
+      await loadProfile();
+
       clearMessageSoon();
     } catch (err) {
-      setMessage({ type: "error", text: err?.response?.data?.message || "Failed to change password." });
+      console.error("Change password error:", err);
+
+      setMessage({
+        type: "error",
+        text:
+          err?.response?.data?.message ||
+          err?.message ||
+          "Failed to change password.",
+      });
+
       clearMessageSoon();
     } finally {
       setSubmitting(false);
@@ -124,11 +193,14 @@ export default function AdminProfile() {
 
   return (
     <div className="adminProfilePage">
+      {/* TOP BAR */}
       <div className="adminProfileTopbar">
         <div className="adminProfileTitle">
           <h1>
-            Profile <span className="adminProfileBadge">ReserveX Admin Portal</span>
+            Profile{" "}
+            <span className="adminProfileBadge">ReserveX Admin Portal</span>
           </h1>
+
           <p>Account details and security settings.</p>
         </div>
 
@@ -136,76 +208,101 @@ export default function AdminProfile() {
           <Link to="/dashboard" className="apBtn apBtnSecondary">
             Back to Dashboard
           </Link>
+
           <button
             type="button"
             className="apBtn apBtnDanger"
-              onClick={() => setShowLogoutModal(true)}
+            onClick={() => setShowLogoutModal(true)}
           >
             Sign Out
           </button>
         </div>
       </div>
 
+      {/* MESSAGE */}
       {message && (
-        <div className={`apAlert ${message.type === "success" ? "success" : "error"}`}>
+        <div
+          className={`apAlert ${
+            message.type === "success" ? "success" : "error"
+          }`}
+        >
           {message.text}
         </div>
       )}
 
+      {/* PROFILE LAYOUT */}
       <div className="adminProfileLayout">
+        {/* PROFILE CARD */}
         <aside className="adminProfileCard">
           <div className="adminProfileCardHeader">
             <div className="adminProfileAvatar" aria-hidden="true">
               {profile?.username?.slice(0, 1)?.toUpperCase() || "A"}
             </div>
+
             <div className="adminProfileCardMeta">
               <div className="adminProfileName">
                 {profile?.username || user?.username || "—"}
               </div>
+
               <div className="adminProfileSub">
                 {profile?.email || user?.sub || "—"}
               </div>
+
               <div className="adminProfileRolePill">
-                {(profile?.role || user?.role || "EMPLOYEE").toString().replace("ROLE_", "")}
+                {(profile?.role || user?.role || "EMPLOYEE")
+                  .toString()
+                  .replace("ROLE_", "")}
               </div>
-                <div className="adminProfileStatusRow">
-                  <span className="adminProfileStatusDot" />
-                  <span className="adminProfileStatusText">Active</span>
-                </div>
+
+              <div className="adminProfileStatusRow">
+                <span className="adminProfileStatusDot" />
+
+                <span className="adminProfileStatusText">Active</span>
+              </div>
             </div>
           </div>
 
           <div className="adminProfileCardBody">
             <div className="adminProfileKV">
               <div className="k">Created at</div>
+
               <div className="v">{formatDateTime(profile?.createdAt)}</div>
             </div>
+
             <div className="adminProfileKV">
               <div className="k">Last updated</div>
+
               <div className="v">{formatDateTime(profile?.lastUpdatedAt)}</div>
             </div>
           </div>
         </aside>
 
+        {/* MAIN CONTENT */}
         <main className="adminProfileMain">
+          {/* ACCOUNT DETAILS */}
           <section className="apSection">
             <div className="apSectionHeader">
               <h2>Account Details</h2>
+
               <p>Username and email are managed by super admins.</p>
             </div>
 
             <div className="apStack">
               <div className="apField apFieldSpaced">
                 <label htmlFor="username">Username</label>
+
                 <input id="username" value={profile?.username || ""} readOnly />
               </div>
+
               <div className="apField apFieldSpaced">
                 <label htmlFor="email">Email</label>
+
                 <input id="email" value={profile?.email || ""} readOnly />
               </div>
             </div>
 
             {loadingProfile && <div className="apHint">Loading profile…</div>}
+
             {!loadingProfile && !profile && (
               <div className="apHint apHintError">
                 Couldn’t load profile. Please try again.
@@ -213,16 +310,20 @@ export default function AdminProfile() {
             )}
           </section>
 
+          {/* CHANGE PASSWORD */}
           <section className="apSection">
             <div className="apSectionHeader">
               <h2>Change Password</h2>
+
               <p>Use a strong password that you don’t reuse elsewhere.</p>
             </div>
 
             <form onSubmit={handleChangePassword} className="apForm">
               <div className="apGrid2">
+                {/* CURRENT PASSWORD */}
                 <div className="apField apSpan2">
                   <label htmlFor="currentPassword">Current password</label>
+
                   <input
                     id="currentPassword"
                     type="password"
@@ -231,8 +332,10 @@ export default function AdminProfile() {
                   />
                 </div>
 
+                {/* NEW PASSWORD */}
                 <div className="apField">
                   <label htmlFor="newPassword">New password</label>
+
                   <input
                     id="newPassword"
                     name="newPassword"
@@ -245,8 +348,10 @@ export default function AdminProfile() {
                   />
                 </div>
 
+                {/* CONFIRM PASSWORD */}
                 <div className="apField">
                   <label htmlFor="confirmPassword">Confirm new password</label>
+
                   <input
                     id="confirmPassword"
                     name="confirmPassword"
@@ -260,30 +365,76 @@ export default function AdminProfile() {
                 </div>
               </div>
 
+              {/* PASSWORD POLICY */}
               {form.newPassword.length > 0 && (
                 <div className="apPolicy">
-                  <div className={`apPolicyItem ${passwordChecks.minLength ? "ok" : "bad"}`}>At least 8 characters</div>
-                  <div className={`apPolicyItem ${passwordChecks.hasLower ? "ok" : "bad"}`}>At least 1 lowercase letter</div>
-                  <div className={`apPolicyItem ${passwordChecks.hasNumber ? "ok" : "bad"}`}>At least 1 number</div>
-                  <div className={`apPolicyItem ${passwordChecks.hasSpecial ? "ok" : "bad"}`}>At least 1 special character</div>
-                  <div className={`apPolicyItem ${passwordChecks.matchesConfirm ? "ok" : "bad"}`}>Matches confirmation</div>
+                  <div
+                    className={`apPolicyItem ${
+                      passwordChecks.minLength ? "ok" : "bad"
+                    }`}
+                  >
+                    At least 8 characters
+                  </div>
+
+                  <div
+                    className={`apPolicyItem ${
+                      passwordChecks.hasLower ? "ok" : "bad"
+                    }`}
+                  >
+                    At least 1 lowercase letter
+                  </div>
+
+                  <div
+                    className={`apPolicyItem ${
+                      passwordChecks.hasNumber ? "ok" : "bad"
+                    }`}
+                  >
+                    At least 1 number
+                  </div>
+
+                  <div
+                    className={`apPolicyItem ${
+                      passwordChecks.hasSpecial ? "ok" : "bad"
+                    }`}
+                  >
+                    At least 1 special character
+                  </div>
+
+                  <div
+                    className={`apPolicyItem ${
+                      passwordChecks.matchesConfirm ? "ok" : "bad"
+                    }`}
+                  >
+                    Matches confirmation
+                  </div>
                 </div>
               )}
 
+              {/* ACTIONS */}
               <div className="apActions">
                 <button
                   type="button"
                   className="apBtn apBtnSecondary"
                   onClick={() => {
-                    setForm({ newPassword: "", confirmPassword: "" });
+                    setForm({
+                      newPassword: "",
+                      confirmPassword: "",
+                    });
+
                     setMessage(null);
+
                     loadProfile();
                   }}
                   disabled={submitting}
                 >
                   Refresh
                 </button>
-                <button type="submit" className="apBtn apBtnPrimary" disabled={!canSubmit}>
+
+                <button
+                  type="submit"
+                  className="apBtn apBtnPrimary"
+                  disabled={!canSubmit}
+                >
                   {submitting ? "Changing…" : "Change Password"}
                 </button>
               </div>
@@ -292,17 +443,17 @@ export default function AdminProfile() {
         </main>
       </div>
 
+      {/* LOGOUT MODAL */}
       {showLogoutModal && (
         <div
           className="logout-modal-overlay"
           onClick={() => setShowLogoutModal(false)}
         >
-          <div
-            className="logout-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="logout-modal" onClick={(e) => e.stopPropagation()}>
             <h2>Confirm Logout</h2>
+
             <p>Are you sure you want to logout?</p>
+
             <div className="logout-modal-buttons">
               <button
                 type="button"
@@ -315,6 +466,7 @@ export default function AdminProfile() {
               >
                 Yes, Logout
               </button>
+
               <button
                 type="button"
                 className="logout-modal-btn cancel-btn"

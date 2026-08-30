@@ -21,68 +21,172 @@ public class StallController {
 
     private final StallService stallService;
 
+    // GET ALL STALLS
+    // Public / authenticated users can view available stalls
+
     @GetMapping
     public ResponseEntity<List<StallDto>> getAllStalls() {
-        return ResponseEntity.ok(stallService.getAllStallsWithAvailability());
+        return ResponseEntity.ok(
+                stallService.getAllStallsWithAvailability()
+        );
     }
+
+    // CHECK STALL NAME
+    // Public / authenticated users can check stall name
 
     @GetMapping("/check-name")
     public ResponseEntity<Map<String, Boolean>> checkName(
             @RequestParam String name,
             @RequestParam(required = false) Integer excludeId) {
-        boolean taken = excludeId != null
-                ? stallService.isNameTakenExcluding(name, excludeId)
-                : stallService.isNameTaken(name);
-        return ResponseEntity.ok(Map.of("taken", taken));
+
+        boolean taken =
+                excludeId != null
+                        ? stallService.isNameTakenExcluding(
+                        name,
+                        excludeId
+                )
+                        : stallService.isNameTaken(name);
+
+        return ResponseEntity.ok(
+                Map.of("taken", taken)
+        );
     }
 
-    @PreAuthorize("hasRole('EMPLOYEE')")
+    // CREATE STALL
+    // ORGANIZER ONLY
+
+    @PreAuthorize("hasRole('Organizer')")
     @PostMapping
-    public ResponseEntity<?> createStall(@Valid @RequestBody CreateStallRequest request) {
+    public ResponseEntity<?> createStall(
+            @Valid @RequestBody CreateStallRequest request) {
+
         try {
-            StallDto dto = stallService.createStall(request);
-            return ResponseEntity.status(HttpStatus.CREATED).body(dto);
+
+            StallDto dto =
+                    stallService.createStall(request);
+
+            return ResponseEntity
+                    .status(HttpStatus.CREATED)
+                    .body(dto);
+
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+
+            return ResponseEntity
+                    .badRequest()
+                    .body(
+                            Map.of(
+                                    "message",
+                                    e.getMessage()
+                            )
+                    );
         }
     }
 
-    @PreAuthorize("hasRole('EMPLOYEE')")
+    // UPDATE STALL
+    // ORGANIZER ONLY
+
+    @PreAuthorize("hasRole('Organizer')")
     @PutMapping("/{id}")
     public ResponseEntity<?> updateStall(
             @PathVariable Integer id,
             @Valid @RequestBody UpdateStallRequest request) {
+
         try {
-            StallDto dto = stallService.updateStall(id, request);
+
+            StallDto dto =
+                    stallService.updateStall(
+                            id,
+                            request
+                    );
+
             return ResponseEntity.ok(dto);
+
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+
+            return ResponseEntity
+                    .badRequest()
+                    .body(
+                            Map.of(
+                                    "message",
+                                    e.getMessage()
+                            )
+                    );
         }
     }
 
-    @PreAuthorize("hasRole('EMPLOYEE')")
+    // DELETE STALL
+    // ORGANIZER ONLY
+
+    @PreAuthorize("hasRole('Organizer')")
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteStall(@PathVariable Integer id) {
+    public ResponseEntity<?> deleteStall(
+            @PathVariable Integer id) {
+
         try {
+
             stallService.deleteStall(id);
-            return ResponseEntity.ok(Map.of("message", "Stall deleted successfully"));
+
+            return ResponseEntity.ok(
+                    Map.of(
+                            "message",
+                            "Stall deleted successfully"
+                    )
+            );
+
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+
+            return ResponseEntity
+                    .badRequest()
+                    .body(
+                            Map.of(
+                                    "message",
+                                    e.getMessage()
+                            )
+                    );
         }
     }
 
-    @PreAuthorize("hasRole('EMPLOYEE')")
+    // UNRESERVE STALL
+    // ORGANIZER ONLY
+
+    @PreAuthorize("hasRole('Organizer')")
     @PutMapping("/{id}/unreserve")
-    public ResponseEntity<?> unreserveStall(@PathVariable Integer id) {
+    public ResponseEntity<?> unreserveStall(
+            @PathVariable Integer id) {
+
         try {
+
             stallService.unreserveStall(id);
-            return ResponseEntity.ok(Map.of("message", "Stall unreserved successfully"));
+
+            return ResponseEntity.ok(
+                    Map.of(
+                            "message",
+                            "Stall unreserved successfully"
+                    )
+            );
+
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+
+            return ResponseEntity
+                    .badRequest()
+                    .body(
+                            Map.of(
+                                    "message",
+                                    e.getMessage()
+                            )
+                    );
+
         } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("message", "An unexpected error occurred: " + e.getMessage()));
+
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(
+                            Map.of(
+                                    "message",
+                                    "An unexpected error occurred: "
+                                            + e.getMessage()
+                            )
+                    );
         }
     }
 }

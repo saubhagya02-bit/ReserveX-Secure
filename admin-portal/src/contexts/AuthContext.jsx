@@ -1,64 +1,247 @@
-import React, { createContext, useState, useEffect } from 'react';
-import api from '../services/api';
-import { jwtDecode } from "jwt-decode";
+import {
+  createContext,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
+import { useAuthContext } from "@asgardeo/auth-react";
 
 export const AuthContext = createContext();
 
+const BASE_URL = "https://localhost:8443/api";
+const SDK_TIMEOUT_MS = 4000;
+
 export const AuthProvider = ({ children }) => {
-    const [user, setUser] = useState(null);
-    const [loading, setLoading] = useState(true);
+  const { state, signIn, signOut, httpRequest } = useAuthContext();
 
-    const logout = () => {
-        localStorage.removeItem('token');
-        setUser(null);
+  const [backendUser, setBackendUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [sdkStalled, setSdkStalled] = useState(false);
+
+  const hasFetched = useRef(false);
+  const fetchInFlight = useRef(false);
+
+  // ASGARDEO SDK TIMEOUT
+
+  useEffect(() => {
+    if (!state.isLoading) {
+      setSdkStalled(false);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      console.warn(
+        "[admin-auth] Asgardeo SDK isLoading did not resolve after",
+        SDK_TIMEOUT_MS,
+        "ms.",
+      );
+
+      setSdkStalled(true);
+    }, SDK_TIMEOUT_MS);
+
+    return () => clearTimeout(timer);
+  }, [state.isLoading]);
+
+  // FETCH BACKEND USER
+  // ADMIN PORTAL = ORGANIZER ONLY
+
+  const fetchBackendUser = useCallback(async () => {
+    if (fetchInFlight.current) {
+      return;
+    }
+
+    fetchInFlight.current = true;
+
+    try {
+      setLoading(true);
+
+      const response = await httpRequest({
+        url: `${BASE_URL}/users/me`,
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      const userData = response.data;
+
+      console.log("[admin-auth] Backend user:", userData);
+
+      // ========================================================
+      // ADMIN PORTAL IS ONLY FOR ORGANIZERS
+      // ========================================================
+
+      if (userData?.role !== "EMPLOYEE") {
+        console.warn(
+          "[admin-auth] Non-organizer attempted to access Admin Portal:",
+          userData?.role,
+        );
+
+        setBackendUser(null);
+        hasFetched.current = false;
+
+        alert(
+          "Access Denied: This portal is for Organizers only. Please use the Online Portal.",
+        );
+
+        await signOut();
+
+        return;
+      }
+
+      // ========================================================
+      // VALID ORGANIZER
+      // ========================================================
+
+      setBackendUser(userData);
+      hasFetched.current = true;
+    } catch (err) {
+      console.error(
+        "[admin-auth] fetchBackendUser error:",
+        err?.response?.status,
+        err?.response?.data || err,
+      );
+
+      setBackendUser(null);
+      hasFetched.current = true;
+    } finally {
+      setLoading(false);
+      fetchInFlight.current = false;
+    }
+  }, [httpRequest, signOut]);
+
+  // AUTHENTICATION STATE
+
+  useEffect(() => {
+    if (state.isAuthenticated && !hasFetched.current) {
+      fetchBackendUser();
+    } else if (!state.isAuthenticated) {
+      setBackendUser(null);
+      hasFetched.current = false;
+      setLoading(false);
+    }
+  }, [state.isAuthenticated, fetchBackendUser]);
+
+  // LOGIN
+
+  const login = useCallback(() => {
+    signIn();
+  }, [signIn]);
+
+  // LOGOUT
+
+  const logout = useCallback(async () => {
+    hasFetched.current = false;
+    fetchInFlight.current = false;
+
+    setBackendUser(null);
+
+    await signOut();
+  }, [signOut]);
+
+  // REFRESH USER
+
+  const refreshUser = useCallback(async () => {
+    hasFetched.current = false;
+
+    await fetchBackendUser();
+  }, [fetchBackendUser]);
+
+  // API REQUEST HELPER
+
+  const apiRequest = useCallback(
+    async (path, method = "GET", data = null) => {
+      const config = {
+        url: `${BASE_URL}${path}`,
+        method,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      };
+
+      if (data !== null && data !== undefined) {
+        config.data = data;
+      }
+
+      const response = await httpRequest(config);
+
+      return response.data;
+    },
+    [httpRequest],
+  );
+
+  // USER OBJECT
+
+  const user = useMemo(() => {
+    if (!state.isAuthenticated) {
+      return null;
+    }
+
+    return {
+      username: state.username || "",
+
+      email: state.email || "",
+
+      displayName: state.displayName || state.username || "",
+
+      sub: state.username || "",
+
+      // Backend user information
+      id: backendUser?.id,
+
+      role: backendUser?.role || null,
+
+      businessName:
+        backendUser?.businessName || state.displayName || state.username || "",
+
+      noOfCurrentBookings: backendUser?.noOfCurrentBookings ?? 0,
     };
+  }, [
+    state.isAuthenticated,
+    state.username,
+    state.email,
+    state.displayName,
+    backendUser,
+  ]);
 
-    useEffect(() => {
-        // Check for existing token on page load to keep user logged in
-        const token = localStorage.getItem('token');
-        if (token) {
-            try {
-                const decoded = jwtDecode(token);
-                // Check if token is expired
-                if (decoded.exp * 1000 < Date.now()) {
-                    localStorage.removeItem('token');
-                    setUser(null);
-                } else {
-                    setUser(decoded);
-                }
-            } catch (error) {
-                console.error('Token decode error:', error);
-                localStorage.removeItem('token');
-                setUser(null);
-            }
-        }
-        setLoading(false);
-    }, []);
+  // CONTEXT VALUE
 
-    const login = async (email, password) => {
-        try {
-            // Adjust this URL if your backend login endpoint is different
-            const response = await api.post('/auth/login', { email, password });
-            
-            // Assuming your backend returns { "token": "..." }
-            const { token } = response.data; 
+  const contextValue = useMemo(
+    () => ({
+      isAuthenticated: state.isAuthenticated,
 
-            if (token) {
-                localStorage.setItem('token', token);
-                const decoded = jwtDecode(token);
-                setUser(decoded);
-                return true;
-            }
-            return false;
-        } catch (error) {
-            console.error("Login failed:", error);
-            return false;
-        }
-    };
+      isLoading: (state.isLoading && !sdkStalled) || loading,
 
-    return (
-        <AuthContext.Provider value={{ user, login, logout, loading }}>
-            {!loading && children}
-        </AuthContext.Provider>
-    );
+      user,
+
+      login,
+      logout,
+
+      httpRequest,
+
+      apiRequest,
+
+      refreshUser,
+    }),
+    [
+      state.isAuthenticated,
+      state.isLoading,
+      sdkStalled,
+      loading,
+      user,
+      login,
+      logout,
+      httpRequest,
+      apiRequest,
+      refreshUser,
+    ],
+  );
+
+  // PROVIDER
+
+  return (
+    <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
+  );
 };
