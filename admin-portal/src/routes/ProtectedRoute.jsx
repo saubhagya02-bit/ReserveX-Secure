@@ -3,9 +3,10 @@ import { Navigate, Outlet } from "react-router-dom";
 import { AuthContext } from "../contexts/AuthContext";
 
 function ProtectedRoute() {
-  const { isAuthenticated, loading } = useContext(AuthContext);
+  const { isAuthenticated, isLoading, user } = useContext(AuthContext);
 
-  if (loading) {
+  // WAIT FOR ASGARDEO + BACKEND ROLE CHECK
+  if (isLoading) {
     return (
       <div
         style={{
@@ -24,12 +25,22 @@ function ProtectedRoute() {
             borderRadius: "50%",
             animation: "spin 1s linear infinite",
           }}
-        ></div>
+        />
       </div>
     );
   }
 
-  if (!isAuthenticated) return <Navigate to="/" replace />;
+  // NOT AUTHENTICATED
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // AUTHENTICATED BUT NOT ORGANIZER
+  if (!user || user.role !== "EMPLOYEE") {
+    return <Navigate to="/login?error=organizer-only" replace />;
+  }
+
+  // ORGANIZER
   return <Outlet />;
 }
 
