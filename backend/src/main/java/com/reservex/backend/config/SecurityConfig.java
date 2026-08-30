@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -13,24 +14,23 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
-import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.cors.CorsConfigurationSource;
 
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
-import org.springframework.web.client.RestTemplate;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
-
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
-import org.springframework.web.client.RestTemplate;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -48,66 +48,178 @@ public class SecurityConfig {
     @Value("${spring.security.oauth2.resourceserver.jwt.jwk-set-uri}")
     private String jwkSetUri;
 
+
+    // PASSWORD ENCODER
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
+
+    // AUTHENTICATION MANAGER
+
     @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
+    public AuthenticationManager authenticationManager(
+            AuthenticationConfiguration config) throws Exception {
+
         return config.getAuthenticationManager();
     }
 
+
+    // DAO AUTHENTICATION PROVIDER
+
     @Bean
     public DaoAuthenticationProvider authenticationProvider() {
-        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider(userDetailsService);
+
+        DaoAuthenticationProvider authProvider =
+                new DaoAuthenticationProvider(userDetailsService);
+
         authProvider.setPasswordEncoder(passwordEncoder());
+
         return authProvider;
     }
 
-    // Converts Asgardeo JWT roles claim into Spring Security authorities
+
     @Bean
     public JwtAuthenticationConverter jwtAuthenticationConverter() {
-        JwtGrantedAuthoritiesConverter converter = new JwtGrantedAuthoritiesConverter();
-        converter.setAuthoritiesClaimName("roles");
-        converter.setAuthorityPrefix("ROLE_");
 
-        JwtAuthenticationConverter jwtConverter = new JwtAuthenticationConverter();
-        jwtConverter.setJwtGrantedAuthoritiesConverter(converter);
+        JwtAuthenticationConverter jwtConverter =
+                new JwtAuthenticationConverter();
+
+        jwtConverter.setJwtGrantedAuthoritiesConverter(jwt -> {
+
+            Collection<GrantedAuthority> authorities =
+                    new ArrayList<>();
+
+            // ASGARDEO ROLES
+
+            List<String> roles =
+                    jwt.getClaimAsStringList("roles");
+
+            if (roles != null) {
+
+                for (String role : roles) {
+
+                    if (role == null || role.isBlank()) {
+                        continue;
+                    }
+
+                    String authority =
+                            "ROLE_" + role;
+
+                    authorities.add(
+                            new SimpleGrantedAuthority(authority)
+                    );
+
+                    log.info(
+                            "Asgardeo role '{}' -> authority '{}'",
+                            role,
+                            authority
+                    );
+                }
+            }
+
+
+            String scope =
+                    jwt.getClaimAsString("scope");
+
+            if (scope != null && !scope.isBlank()) {
+
+                Arrays.stream(scope.split(" "))
+                        .filter(s -> !s.isBlank())
+                        .forEach(s -> {
+
+                            String authority =
+                                    "SCOPE_" + s;
+
+                            authorities.add(
+                                    new SimpleGrantedAuthority(
+                                            authority
+                                    )
+                            );
+                        });
+            }
+
+
+            log.info(
+                    "Final JWT authorities: {}",
+                    authorities
+            );
+
+            return authorities;
+        });
+
         return jwtConverter;
     }
 
+
+    // JWT DECODER
+
     @Bean
     public JwtDecoder jwtDecoder() {
-        var factory = new SimpleClientHttpRequestFactory();
+
+        SimpleClientHttpRequestFactory factory =
+                new SimpleClientHttpRequestFactory();
+
         factory.setConnectTimeout(30000);
         factory.setReadTimeout(30000);
-        var restTemplate = new RestTemplate();
+
+        RestTemplate restTemplate =
+                new RestTemplate();
+
         restTemplate.setRequestFactory(factory);
 
-        NimbusJwtDecoder decoder = NimbusJwtDecoder
-                .withJwkSetUri(jwkSetUri)
-                .restOperations(restTemplate)
-                .build();
+        NimbusJwtDecoder decoder =
+                NimbusJwtDecoder
+                        .withJwkSetUri(jwkSetUri)
+                        .restOperations(restTemplate)
+                        .build();
 
         decoder.setJwtValidator(
-                token -> org.springframework.security.oauth2.core.OAuth2TokenValidatorResult.success()
+                token ->
+                        org.springframework.security.oauth2.core
+                                .OAuth2TokenValidatorResult
+                                .success()
         );
 
         return decoder;
     }
 
+
+    // SECURITY FILTER CHAIN
+
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(
+            HttpSecurity http) throws Exception {
+
         http
-                .cors(cors -> cors.configurationSource(corsConfigurationSource))
 
-                .csrf(csrf -> csrf.disable())
+                // ------------------------------------------------
+                // CORS
+                // ------------------------------------------------
 
-                // Security Headers
+                .cors(cors ->
+                        cors.configurationSource(
+                                corsConfigurationSource
+                        )
+                )
+
+
+                // ------------------------------------------------
+                // CSRF
+                // ------------------------------------------------
+
+                .csrf(csrf ->
+                        csrf.disable()
+                )
+
+                // SECURITY HEADER
+
                 .headers(headers -> headers
-                        .contentSecurityPolicy(csp -> csp
-                                .policyDirectives(
+
+                        .contentSecurityPolicy(csp ->
+                                csp.policyDirectives(
                                         "default-src 'self'; " +
                                                 "script-src 'self'; " +
                                                 "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
@@ -116,57 +228,150 @@ public class SecurityConfig {
                                                 "connect-src 'self' https://api.asgardeo.io https://localhost:8443"
                                 )
                         )
-                        .frameOptions(frame -> frame.deny())
-                )
 
-                // Return 401 JSON on auth errors
-                .exceptionHandling(ex -> ex
-                        .authenticationEntryPoint(jwtAuthEntryPoint)
-                )
-
-                // No sessions - every request must carry a token
-                .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                )
-
-                // URL rules
-                .authorizeHttpRequests(authorize -> authorize
-
-                        // PUBLIC - no token needed
-                        .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/stalls/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/genres").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/contact").permitAll()
-
-                        // ADMIN PORTAL - uses your custom JWT (EMPLOYEE role)
-                        .requestMatchers("/api/admin/**").hasRole("EMPLOYEE")
-                        .requestMatchers(HttpMethod.POST, "/api/stalls/**").hasRole("EMPLOYEE")
-                        .requestMatchers(HttpMethod.PUT, "/api/stalls/**").hasRole("EMPLOYEE")
-                        .requestMatchers(HttpMethod.DELETE, "/api/stalls/**").hasRole("EMPLOYEE")
-
-                        // VENDOR PORTAL - uses Asgardeo token
-                        .requestMatchers("/api/reservations/**").authenticated()
-                        .requestMatchers("/api/users/**").authenticated()
-
-                        // Everything else needs authentication
-                        .anyRequest().authenticated()
-                )
-
-                // Validate Asgardeo tokens using JWK Set
-                .oauth2ResourceServer(oauth2 -> oauth2
-                        .jwt(jwt -> jwt
-                                .decoder(jwtDecoder())
-                                .jwtAuthenticationConverter(jwtAuthenticationConverter())
+                        .frameOptions(frame ->
+                                frame.deny()
                         )
                 )
 
-                .authenticationProvider(authenticationProvider());
 
-        // Rate limiting before everything
-        http.addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class);
+                // EXCEPTION HANDLING
 
-        // Your existing JWT filter for admin portal
-        http.addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+                .exceptionHandling(ex ->
+                        ex.authenticationEntryPoint(
+                                jwtAuthEntryPoint
+                        )
+                )
+
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(
+                                SessionCreationPolicy.STATELESS
+                        )
+                )
+
+                // AUTHORIZATION
+
+                .authorizeHttpRequests(authorize -> authorize
+
+
+                        // =========================================
+                        // PUBLIC ENDPOINTS
+                        // =========================================
+
+                        .requestMatchers(
+                                "/api/auth/**"
+                        )
+                        .permitAll()
+
+
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/stalls/**"
+                        )
+                        .permitAll()
+
+
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/genres"
+                        )
+                        .permitAll()
+
+
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/contact"
+                        )
+                        .permitAll()
+
+
+
+                        .requestMatchers(
+                                "/api/admin/**"
+                        )
+                        .hasRole("Organizer")
+
+
+
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/stalls/**"
+                        )
+                        .hasRole("Organizer")
+
+
+                        .requestMatchers(
+                                HttpMethod.PUT,
+                                "/api/stalls/**"
+                        )
+                        .hasRole("Organizer")
+
+
+                        .requestMatchers(
+                                HttpMethod.DELETE,
+                                "/api/stalls/**"
+                        )
+                        .hasRole("Organizer")
+
+
+
+                        .requestMatchers(
+                                "/api/reservations/**"
+                        )
+                        .hasRole("Vendor")
+
+
+
+                        .requestMatchers(
+                                "/api/users/**"
+                        )
+                        .hasAnyRole(
+                                "Vendor",
+                                "Organizer"
+                        )
+
+
+
+                        .anyRequest()
+                        .authenticated()
+                )
+
+
+                // ASGARDEO JWT RESOURCE SERVER
+
+                .oauth2ResourceServer(oauth2 ->
+                        oauth2.jwt(jwt ->
+                                jwt
+                                        .decoder(jwtDecoder())
+                                        .jwtAuthenticationConverter(
+                                                jwtAuthenticationConverter()
+                                        )
+                        )
+                )
+
+
+                // CUSTOM AUTHENTICATION PROVIDER
+
+                .authenticationProvider(
+                        authenticationProvider()
+                );
+
+
+        // CUSTOM FILTERS
+
+        // Rate limiting
+        http.addFilterBefore(
+                rateLimitFilter,
+                UsernamePasswordAuthenticationFilter.class
+        );
+
+
+        // Custom JWT filter for Admin/custom JWT authentication
+        http.addFilterBefore(
+                jwtAuthFilter,
+                UsernamePasswordAuthenticationFilter.class
+        );
+
 
         return http.build();
     }
