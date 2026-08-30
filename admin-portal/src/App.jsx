@@ -1,31 +1,50 @@
-import React from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "./contexts/AuthContext"; // Fixed this line
+import React, { useContext } from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
+import { AuthContext } from "./contexts/AuthContext";
 import Login from "./pages/login";
 import Dashboard from "./pages/Dashboard";
 import AdminProfile from "./pages/AdminProfile";
-import "./App.css";
 import ViewStalls from "./pages/ViewStalls.jsx";
 import ManageStalls from "./pages/ManageStalls.jsx";
 import ViewReservations from "./pages/ViewReservations.jsx";
 import ProtectedRoute from "./routes/ProtectedRoute";
+import "./App.css";
 
 function App() {
+  const { isAuthenticated, loading } = useContext(AuthContext);
+
+  if (loading) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "100vh",
+        }}
+      >
+        <p>Loading...</p>
+      </div>
+    );
+  }
+
   return (
-    <AuthProvider>
-      <Router>
-        <Routes>
-          <Route path="/" element={<Login />} />
-          <Route element={<ProtectedRoute />}>
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/admin-profile" element={<AdminProfile />} />
-            <Route path="/view-stalls" element={<ViewStalls />} />
-            <Route path="/view-reservations" element={<ViewReservations />} />
-            <Route path="/manage-stalls" element={<ManageStalls />} />
-          </Route>
-        </Routes>
-      </Router>
-    </AuthProvider>
+    <Routes>
+      <Route
+        path="/"
+        element={
+          isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />
+        }
+      />
+
+      <Route element={<ProtectedRoute />}>
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/admin-profile" element={<AdminProfile />} />
+        <Route path="/view-stalls" element={<ViewStalls />} />
+        <Route path="/manage-stalls" element={<ManageStalls />} />
+        <Route path="/view-reservations" element={<ViewReservations />} />
+      </Route>
+    </Routes>
   );
 }
 
