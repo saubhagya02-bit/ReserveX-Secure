@@ -11,9 +11,9 @@ import ProtectedRoute from "./routes/ProtectedRoute";
 import "./App.css";
 
 function App() {
-  const { isAuthenticated, loading } = useContext(AuthContext);
+  const { isAuthenticated, isLoading, user } = useContext(AuthContext);
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div
         style={{
@@ -28,12 +28,14 @@ function App() {
     );
   }
 
+  const isVerifiedOrganizer = isAuthenticated && user?.role === "EMPLOYEE";
+
   return (
     <Routes>
       <Route
         path="/"
         element={
-          isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />
+          isVerifiedOrganizer ? <Navigate to="/dashboard" replace /> : <Login />
         }
       />
 
